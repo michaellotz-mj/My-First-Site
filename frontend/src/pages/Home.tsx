@@ -1,22 +1,46 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import AddForm from '../components/AddForm';
+import CategoryTabs from '../components/CategoryTabs';
 import EditableText from '../components/EditableText';
 import { api } from '../lib/api';
-import { activityProgress, subcategoryProgress, updateActivityInBoard } from '../lib/progress';
+import { CATEGORY_STYLES } from '../lib/categoryStyles';
+import {
+  activityProgress,
+  categoriesForTab,
+  subcategoryProgress,
+  updateActivityInBoard,
+  type Tab,
+} from '../lib/progress';
 import type { CategoryBoard, CategoryKey, Subcategory } from '../lib/types';
 import { VERSION } from '../version';
 
-/** Per-category colours (full class names so Tailwind picks them up). */
-const CATEGORY_STYLES: Record<CategoryKey, { dot: string; pill: string; bar: string; check: string }> = {
-  work: { dot: 'bg-work', pill: 'bg-work-soft text-work', bar: 'bg-work', check: 'accent-work' },
-  business: { dot: 'bg-business', pill: 'bg-business-soft text-business', bar: 'bg-business', check: 'accent-business' },
-  other: { dot: 'bg-other', pill: 'bg-other-soft text-other', bar: 'bg-other', check: 'accent-other' },
-};
+const TAB_KEY = 'todo-tab';
+const TABS: Tab[] = ['all', 'work', 'business', 'other'];
+
+/** Last-used tab; falls back to "All" if storage is unavailable or holds something unexpected. */
+function loadTab(): Tab {
+  try {
+    const saved = localStorage.getItem(TAB_KEY);
+    return TABS.includes(saved as Tab) ? (saved as Tab) : 'all';
+  } catch {
+    return 'all';
+  }
+}
 
 export default function Home() {
   const [board, setBoard] = useState<CategoryBoard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>(loadTab);
+
+  const selectTab = useCallback((next: Tab) => {
+    setTab(next);
+    try {
+      localStorage.setItem(TAB_KEY, next);
+    } catch {
+      // Remembering the tab is a convenience; ignore storage errors.
+    }
+  }, []);
 
   const reload = useCallback(async () => {
     try {
@@ -73,8 +97,10 @@ export default function Home() {
 
         {!board && !error && <p className="text-slate-500">Loading…</p>}
 
-        <div className="space-y-6">
-          {board?.map((category) => {
+        {board && <CategoryTabs board={board} tab={tab} onChange={selectTab} />}
+
+        <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="space-y-6">
+          {board && categoriesForTab(board, tab).map((category) => {
             const progress = subcategoryProgress(category.subcategories);
             const styles = CATEGORY_STYLES[category.key];
             return (

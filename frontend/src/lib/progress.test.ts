@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activityProgress, subcategoryProgress, updateActivityInBoard } from './progress';
+import { activityProgress, categoriesForTab, subcategoryProgress, updateActivityInBoard } from './progress';
 
 const act = (id: number, done: boolean) => ({ id, title: `a${id}`, done });
 
@@ -32,4 +32,12 @@ describe('updateActivityInBoard', () => {
     expect(next[0].subcategories[0].activities).toEqual([act(1, false), act(2, true)]);
     expect(board[0].subcategories[0].activities[1].done).toBe(false);
   });
+});
+
+describe('categoriesForTab', () => {
+  const board = (['work', 'business', 'other'] as const).map((key) => ({ key, label: key, subcategories: [] }));
+  it('shows every category on the All tab', () =>
+    expect(categoriesForTab(board, 'all').map((c) => c.key)).toEqual(['work', 'business', 'other']));
+  it('shows only the selected category otherwise', () =>
+    expect(categoriesForTab(board, 'business').map((c) => c.key)).toEqual(['business']));
 });

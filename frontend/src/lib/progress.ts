@@ -1,4 +1,4 @@
-import type { Activity, CategoryBoard, Subcategory } from './types';
+import type { Activity, CategoryBoard, CategoryKey, Subcategory } from './types';
 
 export interface Progress {
   done: number;
@@ -33,4 +33,11 @@ export function updateActivityInBoard(
       activities: s.activities.map((a) => (a.id === id ? { ...a, ...changes } : a)),
     })),
   }));
+}
+
+export type Tab = 'all' | CategoryKey;
+
+/** Categories shown for the selected tab: every category for "all", otherwise just that one. */
+export function categoriesForTab(board: CategoryBoard[], tab: Tab): CategoryBoard[] {
+  return tab === 'all' ? board : board.filter((c) => c.key === tab);
 }
