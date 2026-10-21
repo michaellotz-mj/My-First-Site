@@ -46,7 +46,11 @@ jobs:
             echo "::error::GitHub secret DEV_VARS is not set — integration tests need a Neon test branch. See CLAUDE.md > Setup."
             exit 1
           fi
-          printf '%s\n' "$DEV_VARS" > .dev.vars
+          # Accept either full .dev.vars contents or just the bare connection string.
+          case "$DEV_VARS" in
+            postgres://*|postgresql://*) printf 'DATABASE_URL=%s\n' "$DEV_VARS" > .dev.vars ;;
+            *) printf '%s\n' "$DEV_VARS" > .dev.vars ;;
+          esac
           node check-dev-vars.mjs
 
       - name: Start wrangler dev

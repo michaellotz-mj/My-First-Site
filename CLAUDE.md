@@ -62,7 +62,7 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 ## Setup checklist (Michael — one-off, needs your accounts)
 1. **Neon**: create a *new* project just for this app. Recommended: use the default `production` branch (Neon's name for main in new projects) for real data and create a `dev` branch for local + CI so tests never touch real data.
 2. **Local**: `cp api/.dev.vars.example api/.dev.vars`, paste the `dev` branch connection string, then `cd api && npm ci && node mig-001-init.mjs`.
-3. **GitHub secret** `DEV_VARS` (repo → Settings → Secrets → Actions): the full contents of `api/.dev.vars` (dev branch). CI's API job fails with a clear error until this exists.
+3. **GitHub secret** `DEV_VARS` (repo → Settings → Secrets → Actions): either the full contents of `api/.dev.vars` or just the bare `dev` branch connection string. CI's API job fails with a clear error until this exists.
 4. **First API deploy**: `cd api && npx wrangler deploy` (the Worker doesn't exist yet, so there is nothing to wipe). Note the `https://todo-api.<you>.workers.dev` URL.
 5. **Cloudflare dashboard** → Workers → `todo-api` → Settings → Variables and Secrets → add `DATABASE_URL` as type **Secret** (the `production` branch URL). Create the tables on `production` once by pasting `api/schema.sql` into the Neon SQL Editor with `production` selected.
 6. **Frontend**: create `frontend/.env.production` (gitignored) with `VITE_API_URL=https://todo-api.<you>.workers.dev`, then `cd frontend && npm ci && npm run deploy`. Note the frontend URL.
