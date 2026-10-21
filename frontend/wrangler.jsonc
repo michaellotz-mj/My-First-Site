@@ -1,0 +1,9 @@
+{
+  // Static frontend served by Cloudflare Workers assets. No secrets here.
+  "name": "todo-frontend",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

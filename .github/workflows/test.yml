@@ -1,0 +1,73 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - name: Unit tests
+        run: npm test
+
+      - name: Write .dev.vars from secret
+        env:
+          DEV_VARS: ${{ secrets.DEV_VARS }}
+        run: |
+          if [ -z "$DEV_VARS" ]; then
+            echo "::error::GitHub secret DEV_VARS is not set — integration tests need a Neon test branch. See CLAUDE.md > Setup."
+            exit 1
+          fi
+          # Accept either full .dev.vars contents or just the bare connection string.
+          case "$DEV_VARS" in
+            postgres://*|postgresql://*) printf 'DATABASE_URL=%s\n' "$DEV_VARS" > .dev.vars ;;
+            *) printf '%s\n' "$DEV_VARS" > .dev.vars ;;
+          esac
+          node check-dev-vars.mjs
+
+      - name: Start wrangler dev
+        run: |
+          npx wrangler dev --port 8787 > wrangler.log 2>&1 &
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/api/health || true)
+            if [ "$code" = "200" ]; then echo "API ready"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::API did not return 200 from /api/health"
+          cat wrangler.log
+          exit 1
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Remove .dev.vars
+        if: always()
+        run: rm -f .dev.vars

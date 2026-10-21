@@ -1,0 +1,4 @@
+# Copy to .dev.vars (gitignored) and fill in. Never commit the real file.
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
+# Comma-separated extra allowed origins (the deployed frontend URL). localhost is always allowed.
+ALLOWED_ORIGINS=
