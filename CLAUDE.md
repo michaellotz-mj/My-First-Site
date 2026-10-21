@@ -32,6 +32,7 @@ api/
   src/board.ts             pure row → nested board shaping (+ .test.ts)
   schema.sql               reference schema (source of truth)
   mig-001-init.mjs         creates tables; reads DATABASE_URL from .dev.vars
+  check-dev-vars.mjs       validates DATABASE_URL shape in .dev.vars without printing it (run in CI)
   integration.test.ts      live tests against wrangler dev
   wrangler.toml            NO secrets; ALLOWED_ORIGINS lives here
   .dev.vars.example        copy to .dev.vars (gitignored)

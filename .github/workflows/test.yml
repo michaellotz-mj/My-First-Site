@@ -47,6 +47,7 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$DEV_VARS" > .dev.vars
+          node check-dev-vars.mjs
 
       - name: Start wrangler dev
         run: |
