@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import AddForm from '../components/AddForm';
 import CategoryTabs from '../components/CategoryTabs';
+import ConfirmDelete from '../components/ConfirmDelete';
 import EditableText from '../components/EditableText';
 import { api } from '../lib/api';
 import { CATEGORY_STYLES } from '../lib/categoryStyles';
@@ -172,16 +173,15 @@ function SubcategoryCard({ sub, category, mutate, onToggle }: CardProps) {
         <span className="shrink-0 text-xs text-slate-500">
           {progress.done}/{progress.total}
         </span>
-        <button
-          type="button"
-          aria-label={`Delete ${sub.name}`}
-          onClick={() => {
-            if (confirm(`Delete "${sub.name}" and all its activities?`)) mutate(() => api.deleteSubcategory(sub.id));
-          }}
-          className="p-1 text-slate-300 hover:text-red-600"
-        >
-          <Trash2 size={14} />
-        </button>
+        <ConfirmDelete
+          label={sub.name}
+          question={
+            sub.activities.length
+              ? `Delete (${sub.activities.length} ${sub.activities.length === 1 ? 'activity' : 'activities'})?`
+              : 'Delete?'
+          }
+          onConfirm={() => mutate(() => api.deleteSubcategory(sub.id))}
+        />
       </div>
       <div
         role="progressbar"
@@ -213,14 +213,7 @@ function SubcategoryCard({ sub, category, mutate, onToggle }: CardProps) {
                   className="text-sm"
                   onSave={(title) => mutate(() => api.updateActivity(a.id, { title }))}
                 />
-                <button
-                  type="button"
-                  aria-label={`Delete ${a.title}`}
-                  onClick={() => mutate(() => api.deleteActivity(a.id))}
-                  className="p-1 text-slate-300 hover:text-red-600"
-                >
-                  <Trash2 size={14} />
-                </button>
+                <ConfirmDelete label={a.title} onConfirm={() => mutate(() => api.deleteActivity(a.id))} />
               </li>
             ))}
           </ul>

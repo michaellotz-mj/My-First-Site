@@ -21,7 +21,7 @@ frontend/
   src/App.tsx              router (Wouter)
   src/pages/Home.tsx       the whole board (one page)
   src/pages/NotFound.tsx
-  src/components/          AddForm, EditableText, CategoryTabs (All / Work / Business / Other)
+  src/components/          AddForm, EditableText, CategoryTabs (All / Work / Business / Other), ConfirmDelete (+ .test.tsx)
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
   src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering (+ .test.ts)
   src/lib/categoryStyles.ts per-category Tailwind class names
@@ -45,6 +45,7 @@ api/
 - Branding: "Lotz Solutions" eyebrow above the "To Do List" title in a slate-teal header band; tab title "To Do List · Lotz Solutions".
 - Palette lives in `frontend/src/index.css` (`@theme`): cool-grey page, one muted hue per category (Work blue-grey, Business sage, Other sand). `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
 - Tabs: All, Work, Business, Other, each with a done/total sub-category count. The selected tab is remembered in localStorage (`todo-tab`, try/catch, defaults to All). Arrow/Home/End keys move between tabs. On phones the count sits under the label so all four fit.
+- Deleting asks inline ("Delete? Yes / No", No focused, Escape cancels) via `ConfirmDelete`, for both activities and sub-categories. No browser `confirm()`: it is blocked in embedded previews.
 - Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
 
 ## Data model
@@ -104,6 +105,7 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 - Reordering (the `position` columns exist; no UI/API for moving yet).
 
 ## Change log
+- **2026-10-21** — Inline "are you sure?" before deleting activities and sub-categories.
 - **2026-10-21** — Categories split into tabs with an All tab first.
 - **2026-10-21** — Added colour (neutral palette, per-category accents, progress bars) and Lotz Solutions branding.
 - **2026-10-21** — API error logs now pass through `redactSecrets` (the Neon driver puts the full connection string in some error messages). `check-dev-vars.mjs` parses URLs the way the driver does and names common paste mistakes.
