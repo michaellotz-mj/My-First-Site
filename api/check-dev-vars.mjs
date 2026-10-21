@@ -23,7 +23,7 @@ if (dbLines.length === 1) {
   if (!/^postgres(ql)?:\/\//.test(unquoted)) {
     problems.push('value must start with postgresql://');
   } else {
-    if (/^postgres(ql)?:\/\/postgres(ql)?:/.test(unquoted)) problems.push('postgresql:// appears twice at the start');
+    if (/^postgres(ql)?:\/\/postgres(ql)?:\/\//.test(unquoted)) problems.push('postgresql:// appears twice at the start');
     if (/[…<>\[\]]/.test(unquoted)) problems.push('value contains …, < > or [ ] — it looks like a copied example, not the real string from Neon');
     try {
       // Parse the way the Neon driver does: swap the scheme for http: so the host is validated strictly.
