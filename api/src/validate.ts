@@ -45,18 +45,32 @@ export function parseSubcategoryUpdate(body: unknown): Result<{ name: string }> 
   return ok({ name: name.value });
 }
 
+/** A non-empty list of unique positive ids, top first. */
+function idList(value: unknown): Result<number[]> {
+  if (!Array.isArray(value) || value.length === 0) return fail('ids must be a non-empty array');
+  if (value.length > 1000) return fail('ids must have at most 1000 entries');
+  if (!value.every((id) => Number.isInteger(id) && id > 0 && id < 1e9)) return fail('ids must be positive integers');
+  if (new Set(value).size !== value.length) return fail('ids must not repeat');
+  return ok(value as number[]);
+}
+
 /** Full new order of a category's sub-categories, top first. */
 export function parseReorder(body: unknown): Result<{ category: Category; ids: number[] }> {
   if (!isObject(body)) return fail('body must be a JSON object');
   if (!CATEGORIES.includes(body.category as Category)) {
     return fail(`category must be one of: ${CATEGORIES.join(', ')}`);
   }
-  const ids = body.ids;
-  if (!Array.isArray(ids) || ids.length === 0) return fail('ids must be a non-empty array');
-  if (ids.length > 1000) return fail('ids must have at most 1000 entries');
-  if (!ids.every((id) => Number.isInteger(id) && id > 0 && id < 1e9)) return fail('ids must be positive integers');
-  if (new Set(ids).size !== ids.length) return fail('ids must not repeat');
-  return ok({ category: body.category as Category, ids: ids as number[] });
+  const ids = idList(body.ids);
+  if (!ids.ok) return ids;
+  return ok({ category: body.category as Category, ids: ids.value });
+}
+
+/** Full new order of one sub-category's activities, top first. */
+export function parseActivityReorder(body: unknown): Result<{ ids: number[] }> {
+  if (!isObject(body)) return fail('body must be a JSON object');
+  const ids = idList(body.ids);
+  if (!ids.ok) return ids;
+  return ok({ ids: ids.value });
 }
 
 export function parseNewActivity(body: unknown): Result<{ title: string }> {

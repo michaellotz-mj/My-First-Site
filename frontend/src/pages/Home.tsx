@@ -10,7 +10,9 @@ import { CATEGORY_STYLES } from '../lib/categoryStyles';
 import {
   activityProgress,
   categoriesForTab,
+  moveId,
   moveSubcategory,
+  reorderActivitiesInBoard,
   reorderInBoard,
   splitCompleted,
   subcategoryProgress,
@@ -89,6 +91,17 @@ export default function Home() {
     [mutate],
   );
 
+  /** Moves an activity instantly on screen, then saves the sub-category's new activity order. */
+  const moveActivity = useCallback(
+    (sub: Subcategory, id: number, direction: 'up' | 'down') => {
+      const ids = moveId(sub.activities.map((a) => a.id), id, direction);
+      if (!ids) return;
+      setBoard((b) => b && reorderActivitiesInBoard(b, sub.id, ids));
+      return mutate(() => api.reorderActivities(sub.id, ids));
+    },
+    [mutate],
+  );
+
   const visible = board ? categoriesForTab(board, tab) : [];
   const completed = visible.flatMap((c) =>
     splitCompleted(c.subcategories).completed.map((sub) => ({ sub, category: c })),
@@ -143,6 +156,7 @@ export default function Home() {
                       category={category.key}
                       mutate={mutate}
                       onToggle={toggleActivity}
+                      onMoveActivity={moveActivity}
                       onMoveUp={i > 0 ? () => moveSub(category.key, category.subcategories, sub.id, 'up') : undefined}
                       onMoveDown={
                         i < active.length - 1
@@ -170,6 +184,7 @@ export default function Home() {
                 defaultOpen={false}
                 mutate={mutate}
                 onToggle={toggleActivity}
+                onMoveActivity={moveActivity}
               />
             ))}
           </CompletedSection>
@@ -184,6 +199,7 @@ interface CardProps {
   category: CategoryKey;
   mutate: (change: () => Promise<unknown>) => Promise<void>;
   onToggle: (id: number, done: boolean) => Promise<void>;
+  onMoveActivity: (sub: Subcategory, id: number, direction: 'up' | 'down') => void;
   /** Present only when the card can move that way (in-progress cards, not at that end). */
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -197,6 +213,7 @@ function SubcategoryCard({
   category,
   mutate,
   onToggle,
+  onMoveActivity,
   onMoveUp,
   onMoveDown,
   categoryLabel,
@@ -266,7 +283,7 @@ function SubcategoryCard({
       {open && (
         <div className="mt-2 space-y-1 pl-7">
           <ul className="space-y-1">
-            {sub.activities.map((a) => (
+            {sub.activities.map((a, i) => (
               <li key={a.id} className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -282,6 +299,22 @@ function SubcategoryCard({
                   className="text-sm"
                   onSave={(title) => mutate(() => api.updateActivity(a.id, { title }))}
                 />
+                {sub.activities.length > 1 && (
+                  <span className="flex shrink-0">
+                    <MoveButton
+                      label={`Move ${a.title} up`}
+                      onClick={i > 0 ? () => onMoveActivity(sub, a.id, 'up') : undefined}
+                    >
+                      <ArrowUp size={14} />
+                    </MoveButton>
+                    <MoveButton
+                      label={`Move ${a.title} down`}
+                      onClick={i < sub.activities.length - 1 ? () => onMoveActivity(sub, a.id, 'down') : undefined}
+                    >
+                      <ArrowDown size={14} />
+                    </MoveButton>
+                  </span>
+                )}
                 <ConfirmDelete label={a.title} onConfirm={() => mutate(() => api.deleteActivity(a.id))} />
               </li>
             ))}

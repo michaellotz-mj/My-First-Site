@@ -28,6 +28,8 @@ export const api = {
   deleteSubcategory: (id: number) => request<{ ok: true }>('DELETE', `/api/subcategories/${id}`),
   createActivity: (subcategoryId: number, title: string) =>
     request<Activity>('POST', `/api/subcategories/${subcategoryId}/activities`, { title }),
+  reorderActivities: (subcategoryId: number, ids: number[]) =>
+    request<{ ok: true }>('PUT', `/api/subcategories/${subcategoryId}/activities/order`, { ids }),
   updateActivity: (id: number, changes: { title?: string; done?: boolean }) =>
     request<Activity>('PATCH', `/api/activities/${id}`, changes),
   deleteActivity: (id: number) => request<{ ok: true }>('DELETE', `/api/activities/${id}`),

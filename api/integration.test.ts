@@ -71,6 +71,17 @@ describe('To Do API', () => {
     expect(order).toEqual([second.id, subId]);
   });
 
+  it('reorders activities within a sub-category', async () => {
+    const { data: a } = await api('POST', `/api/subcategories/${subId}/activities`, { title: 'First' });
+    const { data: b } = await api('POST', `/api/subcategories/${subId}/activities`, { title: 'Second' });
+    const res = await api('PUT', `/api/subcategories/${subId}/activities/order`, { ids: [b.id, a.id] });
+    expect(res).toEqual({ status: 200, data: { ok: true } });
+    const { data: board } = await api('GET', '/api/board');
+    const sub = board[0].subcategories.find((s: any) => s.id === subId);
+    const order = sub.activities.map((x: any) => x.id).filter((id: number) => id === a.id || id === b.id);
+    expect(order).toEqual([b.id, a.id]);
+  });
+
   it('rejects invalid input with 400 and unknown ids with 404', async () => {
     expect((await api('POST', '/api/subcategories', { category: 'nope', name: 'x' })).status).toBe(400);
     expect((await api('PATCH', '/api/activities/abc', { done: true })).status).toBe(400);

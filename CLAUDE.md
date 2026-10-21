@@ -23,7 +23,7 @@ frontend/
   src/pages/NotFound.tsx
   src/components/          AddForm, EditableText, CategoryTabs (All / Work / Business / Other), ConfirmDelete (+ .test.tsx), CompletedSection
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
-  src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering, completed split, reorder (+ .test.ts)
+  src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering, completed split, reorder (`moveId`, sub-categories and activities) (+ .test.ts)
   src/lib/storage.ts       loadChoice/saveChoice for remembered UI choices (localStorage, never throws)
   src/lib/categoryStyles.ts per-category Tailwind class names
   src/version.ts           bumped by bump-version.mjs on every deploy, shown as a badge
@@ -47,7 +47,7 @@ api/
 - Palette lives in `frontend/src/index.css` (`@theme`): cool-grey page, one muted hue per category (Work blue-grey, Business sage, Other sand). `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
 - Tabs: All, Work, Business, Other, each with a done/total sub-category count. The selected tab is remembered in localStorage (`todo-tab`, try/catch, defaults to All). Arrow/Home/End keys move between tabs. On phones the count sits under the label so all four fit.
 - Deleting asks inline ("Delete? Yes / No", No focused, Escape cancels) via `ConfirmDelete`, for both activities and sub-categories. No browser `confirm()`: it is blocked in embedded previews.
-- Reorder: ▲▼ buttons on in-progress sub-categories move them within their category (optimistic, then `PUT /api/subcategories/order` with the category's full id order). Completed ones keep their relative order at the end.
+- Reorder: ▲▼ buttons on in-progress sub-categories move them within their category (optimistic, then `PUT /api/subcategories/order` with the category's full id order). Completed ones keep their relative order at the end. Activities have the same ▲▼ buttons (shown when a sub-category has 2+ activities) and save via `PUT /api/subcategories/:id/activities/order`.
 - Completed section: fully ticked sub-categories leave their category and appear in one "Completed" section at the bottom of the current tab (tagged with their category, collapsed by default). It can be open, minimised or hidden (`todo-completed-view` in localStorage). Unticking moves a card back.
 - Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
 
@@ -66,6 +66,7 @@ api/
 | PUT | `/api/subcategories/order` | `{category, ids}` | sets `position` = index; ids from other categories ignored |
 | DELETE | `/api/subcategories/:id` | – | cascades to activities |
 | POST | `/api/subcategories/:id/activities` | `{title}` | 404 if sub-category missing |
+| PUT | `/api/subcategories/:id/activities/order` | `{ids}` | sets activity `position` = index; ids from other sub-categories ignored |
 | PATCH | `/api/activities/:id` | `{title?, done?}` | **partial** — omitted fields kept via `COALESCE`; `done_at` maintained |
 | DELETE | `/api/activities/:id` | – | |
 
@@ -106,9 +107,9 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 ## Open items
 - Complete the setup checklist and first deploy (needs Michael's Neon/Cloudflare/GitHub access).
 - Authentication (see Security).
-- Reordering activities within a sub-category (`activities.position` exists; no UI/API yet).
 
 ## Change log
+- **2026-10-21** — Reorder activities within a sub-category (▲▼, new `PUT /api/subcategories/:id/activities/order`, no schema change).
 - **2026-10-21** — Reorder sub-categories (▲▼, new `PUT /api/subcategories/order`, no schema change); completed sub-categories move to a Completed section that can be minimised or hidden. Fixed: API now parses PUT bodies.
 - **2026-10-21** — Inline "are you sure?" before deleting activities and sub-categories.
 - **2026-10-21** — Categories split into tabs with an All tab first.

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   activityProgress,
   categoriesForTab,
+  moveId,
   moveSubcategory,
+  reorderActivitiesInBoard,
   reorderInBoard,
   splitCompleted,
   subcategoryProgress,
@@ -81,5 +83,26 @@ describe('reorderInBoard', () => {
     const next = reorderInBoard(board, 'work', [3, 1, 2]);
     expect(next[0].subcategories.map((s) => s.id)).toEqual([3, 1, 2]);
     expect(next[1]).toBe(board[1]);
+  });
+});
+
+describe('moveId', () => {
+  it('swaps with the neighbour', () => {
+    expect(moveId([1, 2, 3], 2, 'up')).toEqual([2, 1, 3]);
+    expect(moveId([1, 2, 3], 2, 'down')).toEqual([1, 3, 2]);
+  });
+  it('returns null at the ends or for a missing id', () => {
+    expect(moveId([1, 2], 1, 'up')).toBeNull();
+    expect(moveId([1, 2], 2, 'down')).toBeNull();
+    expect(moveId([1, 2], 9, 'up')).toBeNull();
+  });
+});
+
+describe('reorderActivitiesInBoard', () => {
+  it('reorders activities in one sub-category only', () => {
+    const board = [{ key: 'work' as const, label: 'Work', subcategories: [sub(1, false, true, false), sub(2, false, false)] }];
+    const next = reorderActivitiesInBoard(board, 1, [12, 10, 11]);
+    expect(next[0].subcategories[0].activities.map((a) => a.id)).toEqual([12, 10, 11]);
+    expect(next[0].subcategories[1]).toBe(board[0].subcategories[1]);
   });
 });

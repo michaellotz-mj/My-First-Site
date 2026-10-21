@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  parseActivityReorder,
   parseActivityUpdate,
   parseId,
   parseNewActivity,
@@ -64,4 +65,11 @@ describe('parseReorder', () => {
     [{ category: 'home', ids: [1] }],
     [{ category: 'work' }],
   ])('rejects %j', (body) => expect(parseReorder(body).ok).toBe(false));
+});
+
+describe('parseActivityReorder', () => {
+  it('accepts unique positive ids', () =>
+    expect(parseActivityReorder({ ids: [2, 1] })).toEqual({ ok: true, value: { ids: [2, 1] } }));
+  it.each([[{}], [{ ids: [] }], [{ ids: [1, 1] }], [{ ids: [-1] }], [null]])('rejects %j', (body) =>
+    expect(parseActivityReorder(body).ok).toBe(false));
 });

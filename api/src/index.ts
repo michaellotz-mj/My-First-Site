@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { buildBoard, type ActivityRow, type SubcategoryRow } from './board';
 import { redactSecrets } from './redact';
 import {
+  parseActivityReorder,
   parseActivityUpdate,
   parseId,
   parseNewActivity,
@@ -129,6 +130,21 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
             FROM subcategories s WHERE s.id = ${subcategoryId}
             RETURNING id, title, done`;
           return rows.length ? json(rows[0], 201) : notFound();
+        }),
+      ),
+  },
+  {
+    method: 'PUT',
+    pattern: /^\/api\/subcategories\/(\w+)\/activities\/order$/,
+    handler: ({ sql, params, body }) =>
+      validated(parseId(params[0]), (subcategoryId) =>
+        validated(parseActivityReorder(body), async ({ ids }) => {
+          // Position = index in the list. Ids from another sub-category are ignored.
+          await sql`
+            UPDATE activities a SET position = o.ord
+            FROM unnest(${ids}::int[]) WITH ORDINALITY AS o(id, ord)
+            WHERE a.id = o.id AND a.subcategory_id = ${subcategoryId}`;
+          return json({ ok: true });
         }),
       ),
   },
