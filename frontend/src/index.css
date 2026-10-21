@@ -1,1 +1,18 @@
 @import "tailwindcss";
+
+/* Lotz Solutions palette: cool neutrals, one muted hue per category. */
+@theme {
+  --color-page: #eef1f3;
+  --color-brand: #2c4a52;
+  --color-brand-soft: #b9cfd3;
+  --color-work: #3f6b8f;
+  --color-work-soft: #e2ebf3;
+  --color-business: #4d7a5e;
+  --color-business-soft: #e2eee5;
+  --color-other: #8a6a3f;
+  --color-other-soft: #f2ebdf;
+}
+
+body {
+  background: var(--color-page);
+}

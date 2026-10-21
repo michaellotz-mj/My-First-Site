@@ -40,6 +40,11 @@ api/
 .claude/launch.json        api on 8787, frontend on 5174
 ```
 
+## Look and feel
+- Branding: "Lotz Solutions" eyebrow above the "To Do List" title in a slate-teal header band; tab title "To Do List · Lotz Solutions".
+- Palette lives in `frontend/src/index.css` (`@theme`): cool-grey page, one muted hue per category (Work blue-grey, Business sage, Other sand). `CATEGORY_STYLES` in `Home.tsx` maps categories to full class names so Tailwind generates them.
+- Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
+
 ## Data model
 - `subcategories(id, category ∈ {work,business,other}, name, position, created_at)`
 - `activities(id, subcategory_id → subcategories ON DELETE CASCADE, title, done, done_at, position, created_at)`
@@ -97,5 +102,6 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 - Reordering (the `position` columns exist; no UI/API for moving yet).
 
 ## Change log
+- **2026-10-21** — Added colour (neutral palette, per-category accents, progress bars) and Lotz Solutions branding.
 - **2026-10-21** — API error logs now pass through `redactSecrets` (the Neon driver puts the full connection string in some error messages). `check-dev-vars.mjs` parses URLs the way the driver does and names common paste mistakes.
 - **2026-10-21** — Initial scaffold: schema, API (8 routes), single-page board UI, 30 unit tests, 5 integration tests, CI. Verified locally: integration tests against `wrangler dev` + Postgres 16 via a local Neon-HTTP shim (not committed), and a headless-Chromium run of create → tick → strike-through → rename → reload → delete with no orphan rows. Not yet deployed.
