@@ -23,8 +23,12 @@ if (dbLines.length === 1) {
   if (!/^postgres(ql)?:\/\//.test(unquoted)) {
     problems.push('value must start with postgresql://');
   } else {
+    if (/^postgres(ql)?:\/\/postgres(ql)?:/.test(unquoted)) problems.push('postgresql:// appears twice at the start');
+    if (/[…<>\[\]]/.test(unquoted)) problems.push('value contains …, < > or [ ] — it looks like a copied example, not the real string from Neon');
     try {
-      const url = new URL(unquoted);
+      // Parse the way the Neon driver does: swap the scheme for http: so the host is validated strictly.
+      const scheme = new URL(unquoted).protocol;
+      const url = new URL('http:' + unquoted.slice(scheme.length));
       if (!url.username) problems.push('URL has no user name');
       if (!url.password) problems.push('URL has no password — use "Show password" before copying');
       if (!url.hostname) problems.push('URL has no host');

@@ -30,6 +30,7 @@ api/
   src/index.ts             router, CORS, handlers
   src/validate.ts          pure input validation (+ .test.ts)
   src/board.ts             pure row → nested board shaping (+ .test.ts)
+  src/redact.ts            strips connection strings from logged errors (+ .test.ts)
   schema.sql               reference schema (source of truth)
   mig-001-init.mjs         creates tables; reads DATABASE_URL from .dev.vars
   check-dev-vars.mjs       validates DATABASE_URL shape in .dev.vars without printing it (run in CI)
@@ -96,4 +97,5 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 - Reordering (the `position` columns exist; no UI/API for moving yet).
 
 ## Change log
+- **2026-10-21** — API error logs now pass through `redactSecrets` (the Neon driver puts the full connection string in some error messages). `check-dev-vars.mjs` parses URLs the way the driver does and names common paste mistakes.
 - **2026-10-21** — Initial scaffold: schema, API (8 routes), single-page board UI, 30 unit tests, 5 integration tests, CI. Verified locally: integration tests against `wrangler dev` + Postgres 16 via a local Neon-HTTP shim (not committed), and a headless-Chromium run of create → tick → strike-through → rename → reload → delete with no orphan rows. Not yet deployed.

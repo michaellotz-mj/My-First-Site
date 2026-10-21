@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { buildBoard, type ActivityRow, type SubcategoryRow } from './board';
+import { redactSecrets } from './redact';
 import {
   parseActivityUpdate,
   parseId,
@@ -174,8 +175,8 @@ async function route(request: Request, env: Env): Promise<Response> {
   try {
     return await match.handler({ sql: neon<false, false>(env.DATABASE_URL), params, body });
   } catch (err) {
-    // Log the message only — never the connection string or query params.
-    console.error('handler error:', err instanceof Error ? err.message : 'unknown');
+    // Log the message only, with any connection string stripped — never query params.
+    console.error('handler error:', err instanceof Error ? redactSecrets(err.message) : 'unknown');
     return json({ error: 'internal error' }, 500);
   }
 }
