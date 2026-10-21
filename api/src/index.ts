@@ -6,6 +6,7 @@ import {
   parseId,
   parseNewActivity,
   parseNewSubcategory,
+  parseReorder,
   parseSubcategoryUpdate,
   type Result,
 } from './validate';
@@ -77,6 +78,19 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
             (SELECT COALESCE(MAX(position), 0) + 1 FROM subcategories WHERE category = ${category}))
           RETURNING id, category, name`;
         return json({ ...rows[0], activities: [] }, 201);
+      }),
+  },
+  {
+    method: 'PUT',
+    pattern: /^\/api\/subcategories\/order$/,
+    handler: ({ sql, body }) =>
+      validated(parseReorder(body), async ({ category, ids }) => {
+        // Position = index in the list. Ids from another category are ignored.
+        await sql`
+          UPDATE subcategories s SET position = o.ord
+          FROM unnest(${ids}::int[]) WITH ORDINALITY AS o(id, ord)
+          WHERE s.id = o.id AND s.category = ${category}`;
+        return json({ ok: true });
       }),
   },
   {
@@ -159,7 +173,7 @@ async function route(request: Request, env: Env): Promise<Response> {
   if (!match) return json({ error: 'method not allowed' }, 405);
 
   let body: unknown = null;
-  if (request.method === 'POST' || request.method === 'PATCH') {
+  if (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') {
     try {
       body = await request.json();
     } catch {
@@ -187,7 +201,7 @@ export default {
     const corsHeaders: Record<string, string> = isAllowedOrigin(origin, env.ALLOWED_ORIGINS)
       ? {
           'Access-Control-Allow-Origin': origin!,
-          'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
           'Access-Control-Max-Age': '86400',
           Vary: 'Origin',

@@ -15,6 +15,7 @@ async function api(method: string, path: string, body?: unknown) {
 }
 
 let subId: number;
+const extraIds: number[] = [];
 
 beforeAll(async () => {
   const { status, data } = await api('POST', '/api/subcategories', { category: 'work', name: TAG });
@@ -24,7 +25,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // One delete: activities go with it via ON DELETE CASCADE.
-  if (subId) await api('DELETE', `/api/subcategories/${subId}`);
+  for (const id of [subId, ...extraIds]) if (id) await api('DELETE', `/api/subcategories/${id}`);
   const { data } = await api('GET', '/api/board');
   const leftovers = data.flatMap((c: any) => c.subcategories).filter((s: any) => s.name.startsWith(TAG));
   expect(leftovers).toEqual([]);
@@ -58,6 +59,16 @@ describe('To Do API', () => {
   it('renames a subcategory', async () => {
     const res = await api('PATCH', `/api/subcategories/${subId}`, { name: `${TAG} renamed` });
     expect(res.data.name).toBe(`${TAG} renamed`);
+  });
+
+  it('reorders sub-categories within a category', async () => {
+    const { data: second } = await api('POST', '/api/subcategories', { category: 'work', name: `${TAG} second` });
+    extraIds.push(second.id);
+    const res = await api('PUT', '/api/subcategories/order', { category: 'work', ids: [second.id, subId] });
+    expect(res).toEqual({ status: 200, data: { ok: true } });
+    const { data: board } = await api('GET', '/api/board');
+    const order = board[0].subcategories.map((s: any) => s.id).filter((id: number) => id === subId || id === second.id);
+    expect(order).toEqual([second.id, subId]);
   });
 
   it('rejects invalid input with 400 and unknown ids with 404', async () => {

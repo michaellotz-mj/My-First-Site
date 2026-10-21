@@ -21,9 +21,10 @@ frontend/
   src/App.tsx              router (Wouter)
   src/pages/Home.tsx       the whole board (one page)
   src/pages/NotFound.tsx
-  src/components/          AddForm, EditableText, CategoryTabs (All / Work / Business / Other), ConfirmDelete (+ .test.tsx)
+  src/components/          AddForm, EditableText, CategoryTabs (All / Work / Business / Other), ConfirmDelete (+ .test.tsx), CompletedSection
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
-  src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering (+ .test.ts)
+  src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering, completed split, reorder (+ .test.ts)
+  src/lib/storage.ts       loadChoice/saveChoice for remembered UI choices (localStorage, never throws)
   src/lib/categoryStyles.ts per-category Tailwind class names
   src/version.ts           bumped by bump-version.mjs on every deploy, shown as a badge
   wrangler.jsonc           static assets, SPA fallback
@@ -46,6 +47,8 @@ api/
 - Palette lives in `frontend/src/index.css` (`@theme`): cool-grey page, one muted hue per category (Work blue-grey, Business sage, Other sand). `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
 - Tabs: All, Work, Business, Other, each with a done/total sub-category count. The selected tab is remembered in localStorage (`todo-tab`, try/catch, defaults to All). Arrow/Home/End keys move between tabs. On phones the count sits under the label so all four fit.
 - Deleting asks inline ("Delete? Yes / No", No focused, Escape cancels) via `ConfirmDelete`, for both activities and sub-categories. No browser `confirm()`: it is blocked in embedded previews.
+- Reorder: ▲▼ buttons on in-progress sub-categories move them within their category (optimistic, then `PUT /api/subcategories/order` with the category's full id order). Completed ones keep their relative order at the end.
+- Completed section: fully ticked sub-categories leave their category and appear in one "Completed" section at the bottom of the current tab (tagged with their category, collapsed by default). It can be open, minimised or hidden (`todo-completed-view` in localStorage). Unticking moves a card back.
 - Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
 
 ## Data model
@@ -60,6 +63,7 @@ api/
 | GET | `/api/board` | – | all 3 categories, always, with nested sub-categories/activities |
 | POST | `/api/subcategories` | `{category, name}` | 201 |
 | PATCH | `/api/subcategories/:id` | `{name}` | full update (name is the only field) |
+| PUT | `/api/subcategories/order` | `{category, ids}` | sets `position` = index; ids from other categories ignored |
 | DELETE | `/api/subcategories/:id` | – | cascades to activities |
 | POST | `/api/subcategories/:id/activities` | `{title}` | 404 if sub-category missing |
 | PATCH | `/api/activities/:id` | `{title?, done?}` | **partial** — omitted fields kept via `COALESCE`; `done_at` maintained |
@@ -102,11 +106,12 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 ## Open items
 - Complete the setup checklist and first deploy (needs Michael's Neon/Cloudflare/GitHub access).
 - Authentication (see Security).
-- Reordering (the `position` columns exist; no UI/API for moving yet).
+- Reordering activities within a sub-category (`activities.position` exists; no UI/API yet).
 
 ## Change log
+- **2026-10-21** — Reorder sub-categories (▲▼, new `PUT /api/subcategories/order`, no schema change); completed sub-categories move to a Completed section that can be minimised or hidden. Fixed: API now parses PUT bodies.
 - **2026-10-21** — Inline "are you sure?" before deleting activities and sub-categories.
 - **2026-10-21** — Categories split into tabs with an All tab first.
 - **2026-10-21** — Added colour (neutral palette, per-category accents, progress bars) and Lotz Solutions branding.
 - **2026-10-21** — API error logs now pass through `redactSecrets` (the Neon driver puts the full connection string in some error messages). `check-dev-vars.mjs` parses URLs the way the driver does and names common paste mistakes.
-- **2026-10-21** — Initial scaffold: schema, API (8 routes), single-page board UI, 30 unit tests, 5 integration tests, CI. Verified locally: integration tests against `wrangler dev` + Postgres 16 via a local Neon-HTTP shim (not committed), and a headless-Chromium run of create → tick → strike-through → rename → reload → delete with no orphan rows. Not yet deployed.
+- **2026-10-21** — Initial scaffold: schema, API (8 routes at the time), single-page board UI, 30 unit tests, 5 integration tests, CI. Verified locally: integration tests against `wrangler dev` + Postgres 16 via a local Neon-HTTP shim (not committed), and a headless-Chromium run of create → tick → strike-through → rename → reload → delete with no orphan rows. Not yet deployed.

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { activityProgress, categoriesForTab, subcategoryProgress, updateActivityInBoard } from './progress';
+import {
+  activityProgress,
+  categoriesForTab,
+  moveSubcategory,
+  reorderInBoard,
+  splitCompleted,
+  subcategoryProgress,
+  updateActivityInBoard,
+} from './progress';
 
 const act = (id: number, done: boolean) => ({ id, title: `a${id}`, done });
 
@@ -40,4 +48,38 @@ describe('categoriesForTab', () => {
     expect(categoriesForTab(board, 'all').map((c) => c.key)).toEqual(['work', 'business', 'other']));
   it('shows only the selected category otherwise', () =>
     expect(categoriesForTab(board, 'business').map((c) => c.key)).toEqual(['business']));
+});
+
+const sub = (id: number, ...done: boolean[]) => ({ id, name: `s${id}`, activities: done.map((d, i) => act(id * 10 + i, d)) });
+
+describe('splitCompleted', () => {
+  it('moves fully ticked sub-categories out, keeps empty and partial ones in progress', () => {
+    const { active, completed } = splitCompleted([sub(1, true), sub(2), sub(3, true, false), sub(4, true, true)]);
+    expect(active.map((s) => s.id)).toEqual([2, 3]);
+    expect(completed.map((s) => s.id)).toEqual([1, 4]);
+  });
+});
+
+describe('moveSubcategory', () => {
+  const subs = [sub(1, false), sub(2, true), sub(3, false), sub(4, false)];
+  it('swaps with the next in-progress neighbour, skipping completed ones', () =>
+    expect(moveSubcategory(subs, 1, 'down')).toEqual([3, 1, 4, 2]));
+  it('moves up', () => expect(moveSubcategory(subs, 4, 'up')).toEqual([1, 4, 3, 2]));
+  it('returns null at either end', () => {
+    expect(moveSubcategory(subs, 1, 'up')).toBeNull();
+    expect(moveSubcategory(subs, 4, 'down')).toBeNull();
+  });
+  it('returns null for a completed sub-category', () => expect(moveSubcategory(subs, 2, 'up')).toBeNull());
+});
+
+describe('reorderInBoard', () => {
+  it('reorders only the given category', () => {
+    const board = [
+      { key: 'work' as const, label: 'Work', subcategories: [sub(1), sub(2), sub(3)] },
+      { key: 'other' as const, label: 'Other', subcategories: [sub(5), sub(6)] },
+    ];
+    const next = reorderInBoard(board, 'work', [3, 1, 2]);
+    expect(next[0].subcategories.map((s) => s.id)).toEqual([3, 1, 2]);
+    expect(next[1]).toBe(board[1]);
+  });
 });

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight } from 'lucide-react';
 import AddForm from '../components/AddForm';
 import CategoryTabs from '../components/CategoryTabs';
+import CompletedSection, { COMPLETED_VIEWS, type CompletedView } from '../components/CompletedSection';
 import ConfirmDelete from '../components/ConfirmDelete';
 import EditableText from '../components/EditableText';
 import { api } from '../lib/api';
@@ -9,38 +10,37 @@ import { CATEGORY_STYLES } from '../lib/categoryStyles';
 import {
   activityProgress,
   categoriesForTab,
+  moveSubcategory,
+  reorderInBoard,
+  splitCompleted,
   subcategoryProgress,
   updateActivityInBoard,
   type Tab,
 } from '../lib/progress';
+import { loadChoice, saveChoice } from '../lib/storage';
 import type { CategoryBoard, CategoryKey, Subcategory } from '../lib/types';
 import { VERSION } from '../version';
 
 const TAB_KEY = 'todo-tab';
-const TABS: Tab[] = ['all', 'work', 'business', 'other'];
-
-/** Last-used tab; falls back to "All" if storage is unavailable or holds something unexpected. */
-function loadTab(): Tab {
-  try {
-    const saved = localStorage.getItem(TAB_KEY);
-    return TABS.includes(saved as Tab) ? (saved as Tab) : 'all';
-  } catch {
-    return 'all';
-  }
-}
+const TABS: readonly Tab[] = ['all', 'work', 'business', 'other'];
+const COMPLETED_KEY = 'todo-completed-view';
 
 export default function Home() {
   const [board, setBoard] = useState<CategoryBoard[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>(loadTab);
+  const [tab, setTab] = useState<Tab>(() => loadChoice(TAB_KEY, TABS, 'all'));
+  const [completedView, setCompletedView] = useState<CompletedView>(() =>
+    loadChoice(COMPLETED_KEY, COMPLETED_VIEWS, 'open'),
+  );
 
   const selectTab = useCallback((next: Tab) => {
     setTab(next);
-    try {
-      localStorage.setItem(TAB_KEY, next);
-    } catch {
-      // Remembering the tab is a convenience; ignore storage errors.
-    }
+    saveChoice(TAB_KEY, next);
+  }, []);
+
+  const changeCompletedView = useCallback((next: CompletedView) => {
+    setCompletedView(next);
+    saveChoice(COMPLETED_KEY, next);
   }, []);
 
   const reload = useCallback(async () => {
@@ -78,6 +78,22 @@ export default function Home() {
     [mutate],
   );
 
+  /** Moves a sub-category instantly on screen, then saves the category's new order. */
+  const moveSub = useCallback(
+    (category: CategoryKey, subcategories: Subcategory[], id: number, direction: 'up' | 'down') => {
+      const ids = moveSubcategory(subcategories, id, direction);
+      if (!ids) return;
+      setBoard((b) => b && reorderInBoard(b, category, ids));
+      return mutate(() => api.reorderSubcategories(category, ids));
+    },
+    [mutate],
+  );
+
+  const visible = board ? categoriesForTab(board, tab) : [];
+  const completed = visible.flatMap((c) =>
+    splitCompleted(c.subcategories).completed.map((sub) => ({ sub, category: c })),
+  );
+
   return (
     <>
       <header className="bg-brand text-white">
@@ -101,9 +117,10 @@ export default function Home() {
         {board && <CategoryTabs board={board} tab={tab} onChange={selectTab} />}
 
         <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="space-y-6">
-          {board && categoriesForTab(board, tab).map((category) => {
+          {visible.map((category) => {
             const progress = subcategoryProgress(category.subcategories);
             const styles = CATEGORY_STYLES[category.key];
+            const { active } = splitCompleted(category.subcategories);
             return (
               <section key={category.key} aria-labelledby={`cat-${category.key}`}>
                 <div className="mb-2 flex items-center justify-between border-b border-slate-300/70 pb-1.5">
@@ -116,13 +133,22 @@ export default function Home() {
                   </span>
                 </div>
                 <div className="space-y-3">
-                  {category.subcategories.map((sub) => (
+                  {active.length === 0 && progress.total > 0 && (
+                    <p className="text-sm text-slate-500">Everything here is done.</p>
+                  )}
+                  {active.map((sub, i) => (
                     <SubcategoryCard
                       key={sub.id}
                       sub={sub}
                       category={category.key}
                       mutate={mutate}
                       onToggle={toggleActivity}
+                      onMoveUp={i > 0 ? () => moveSub(category.key, category.subcategories, sub.id, 'up') : undefined}
+                      onMoveDown={
+                        i < active.length - 1
+                          ? () => moveSub(category.key, category.subcategories, sub.id, 'down')
+                          : undefined
+                      }
                     />
                   ))}
                   <AddForm
@@ -133,6 +159,20 @@ export default function Home() {
               </section>
             );
           })}
+
+          <CompletedSection count={completed.length} view={completedView} onViewChange={changeCompletedView}>
+            {completed.map(({ sub, category }) => (
+              <SubcategoryCard
+                key={sub.id}
+                sub={sub}
+                category={category.key}
+                categoryLabel={category.label}
+                defaultOpen={false}
+                mutate={mutate}
+                onToggle={toggleActivity}
+              />
+            ))}
+          </CompletedSection>
         </div>
       </main>
     </>
@@ -144,10 +184,26 @@ interface CardProps {
   category: CategoryKey;
   mutate: (change: () => Promise<unknown>) => Promise<void>;
   onToggle: (id: number, done: boolean) => Promise<void>;
+  /** Present only when the card can move that way (in-progress cards, not at that end). */
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  /** Shown as a small tag, for cards in the mixed Completed section. */
+  categoryLabel?: string;
+  defaultOpen?: boolean;
 }
 
-function SubcategoryCard({ sub, category, mutate, onToggle }: CardProps) {
-  const [open, setOpen] = useState(true);
+function SubcategoryCard({
+  sub,
+  category,
+  mutate,
+  onToggle,
+  onMoveUp,
+  onMoveDown,
+  categoryLabel,
+  defaultOpen = true,
+}: CardProps) {
+  const [open, setOpen] = useState(defaultOpen);
+  const reorderable = onMoveUp || onMoveDown;
   const progress = activityProgress(sub.activities);
   const styles = CATEGORY_STYLES[category];
   const percent = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
@@ -170,9 +226,22 @@ function SubcategoryCard({ sub, category, mutate, onToggle }: CardProps) {
           className="font-medium"
           onSave={(name) => mutate(() => api.renameSubcategory(sub.id, name))}
         />
-        <span className="shrink-0 text-xs text-slate-500">
+        {categoryLabel && (
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${styles.pill}`}>{categoryLabel}</span>
+        )}
+        <span className="shrink-0 text-xs text-slate-500 tabular-nums">
           {progress.done}/{progress.total}
         </span>
+        {reorderable && (
+          <span className="flex shrink-0">
+            <MoveButton label={`Move ${sub.name} up`} onClick={onMoveUp}>
+              <ArrowUp size={14} />
+            </MoveButton>
+            <MoveButton label={`Move ${sub.name} down`} onClick={onMoveDown}>
+              <ArrowDown size={14} />
+            </MoveButton>
+          </span>
+        )}
         <ConfirmDelete
           label={sub.name}
           question={
@@ -224,5 +293,19 @@ function SubcategoryCard({ sub, category, mutate, onToggle }: CardProps) {
         </div>
       )}
     </div>
+  );
+}
+
+function MoveButton({ label, onClick, children }: { label: string; onClick?: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      disabled={!onClick}
+      className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:invisible"
+    >
+      {children}
+    </button>
   );
 }

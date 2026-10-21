@@ -23,6 +23,8 @@ export const api = {
     request<Subcategory>('POST', '/api/subcategories', { category, name }),
   renameSubcategory: (id: number, name: string) =>
     request<Subcategory>('PATCH', `/api/subcategories/${id}`, { name }),
+  reorderSubcategories: (category: CategoryKey, ids: number[]) =>
+    request<{ ok: true }>('PUT', '/api/subcategories/order', { category, ids }),
   deleteSubcategory: (id: number) => request<{ ok: true }>('DELETE', `/api/subcategories/${id}`),
   createActivity: (subcategoryId: number, title: string) =>
     request<Activity>('POST', `/api/subcategories/${subcategoryId}/activities`, { title }),

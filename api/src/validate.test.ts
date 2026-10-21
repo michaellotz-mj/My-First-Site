@@ -4,6 +4,7 @@ import {
   parseId,
   parseNewActivity,
   parseNewSubcategory,
+  parseReorder,
   parseSubcategoryUpdate,
 } from './validate';
 
@@ -47,4 +48,20 @@ describe('parseActivityUpdate', () => {
     expect(parseActivityUpdate({ title: 'x' })).toEqual({ ok: true, value: { title: 'x', done: null } }));
   it('rejects an empty update', () => expect(parseActivityUpdate({}).ok).toBe(false));
   it('rejects non-boolean done', () => expect(parseActivityUpdate({ done: 'yes' }).ok).toBe(false));
+});
+
+describe('parseReorder', () => {
+  it('accepts a category and unique positive ids', () =>
+    expect(parseReorder({ category: 'work', ids: [3, 1, 2] })).toEqual({
+      ok: true,
+      value: { category: 'work', ids: [3, 1, 2] },
+    }));
+  it.each([
+    [{ category: 'work', ids: [] }],
+    [{ category: 'work', ids: [1, 1] }],
+    [{ category: 'work', ids: [1, 'x'] }],
+    [{ category: 'work', ids: [0] }],
+    [{ category: 'home', ids: [1] }],
+    [{ category: 'work' }],
+  ])('rejects %j', (body) => expect(parseReorder(body).ok).toBe(false));
 });
