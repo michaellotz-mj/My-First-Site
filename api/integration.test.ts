@@ -1,0 +1,69 @@
+// Live tests against `wrangler dev` (localhost:8787) and the real DATABASE_URL.
+// There is no staging DB: each run creates its own records and deletes them in afterAll.
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+const BASE = process.env.API_BASE ?? 'http://localhost:8787';
+const TAG = `__itest_${Date.now()}`;
+
+async function api(method: string, path: string, body?: unknown) {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { status: res.status, data: (await res.json()) as any };
+}
+
+let subId: number;
+
+beforeAll(async () => {
+  const { status, data } = await api('POST', '/api/subcategories', { category: 'work', name: TAG });
+  expect(status).toBe(201);
+  subId = data.id;
+});
+
+afterAll(async () => {
+  // One delete: activities go with it via ON DELETE CASCADE.
+  if (subId) await api('DELETE', `/api/subcategories/${subId}`);
+  const { data } = await api('GET', '/api/board');
+  const leftovers = data.flatMap((c: any) => c.subcategories).filter((s: any) => s.name.startsWith(TAG));
+  expect(leftovers).toEqual([]);
+});
+
+describe('To Do API', () => {
+  it('health check reaches the database', async () => {
+    expect(await api('GET', '/api/health')).toEqual({ status: 200, data: { ok: true } });
+  });
+
+  it('creates an activity, ticks it, and shows it on the board', async () => {
+    const created = await api('POST', `/api/subcategories/${subId}/activities`, { title: 'Write tests' });
+    expect(created.status).toBe(201);
+    expect(created.data).toMatchObject({ title: 'Write tests', done: false });
+
+    const ticked = await api('PATCH', `/api/activities/${created.data.id}`, { done: true });
+    expect(ticked.data).toMatchObject({ title: 'Write tests', done: true });
+
+    const { data: board } = await api('GET', '/api/board');
+    const sub = board[0].subcategories.find((s: any) => s.id === subId);
+    expect(sub.activities).toEqual([{ id: created.data.id, title: 'Write tests', done: true }]);
+  });
+
+  it('partial update keeps fields that were not sent', async () => {
+    const { data: a } = await api('POST', `/api/subcategories/${subId}/activities`, { title: 'Old' });
+    await api('PATCH', `/api/activities/${a.id}`, { done: true });
+    const renamed = await api('PATCH', `/api/activities/${a.id}`, { title: 'New' });
+    expect(renamed.data).toMatchObject({ title: 'New', done: true });
+  });
+
+  it('renames a subcategory', async () => {
+    const res = await api('PATCH', `/api/subcategories/${subId}`, { name: `${TAG} renamed` });
+    expect(res.data.name).toBe(`${TAG} renamed`);
+  });
+
+  it('rejects invalid input with 400 and unknown ids with 404', async () => {
+    expect((await api('POST', '/api/subcategories', { category: 'nope', name: 'x' })).status).toBe(400);
+    expect((await api('PATCH', '/api/activities/abc', { done: true })).status).toBe(400);
+    expect((await api('PATCH', '/api/activities/999999999', { done: true })).status).toBe(404);
+    expect((await api('POST', '/api/subcategories/999999999/activities', { title: 'x' })).status).toBe(404);
+  });
+});
