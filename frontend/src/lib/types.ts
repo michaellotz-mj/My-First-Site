@@ -10,6 +10,7 @@ export interface Activity {
 export interface Subcategory {
   id: number;
   name: string;
+  notes: string;
   activities: Activity[];
 }
 

@@ -56,6 +56,17 @@ describe('To Do API', () => {
     expect(renamed.data).toMatchObject({ title: 'New', done: true });
   });
 
+  it('saves notes without changing the name, and renaming keeps the notes', async () => {
+    const notes = 'Call Sam\n- ask about v2';
+    const saved = await api('PATCH', `/api/subcategories/${subId}`, { notes });
+    expect(saved.data).toMatchObject({ name: TAG, notes });
+    const renamed = await api('PATCH', `/api/subcategories/${subId}`, { name: `${TAG} n` });
+    expect(renamed.data).toMatchObject({ name: `${TAG} n`, notes });
+    const { data: board } = await api('GET', '/api/board');
+    expect(board[0].subcategories.find((s: any) => s.id === subId).notes).toBe(notes);
+    await api('PATCH', `/api/subcategories/${subId}`, { name: TAG, notes: '' });
+  });
+
   it('renames a subcategory', async () => {
     const res = await api('PATCH', `/api/subcategories/${subId}`, { name: `${TAG} renamed` });
     expect(res.data.name).toBe(`${TAG} renamed`);

@@ -3,23 +3,9 @@
 // Reads DATABASE_URL from .dev.vars — never pass it on the command line.
 import { readFileSync } from 'node:fs';
 import { neon } from '@neondatabase/serverless';
+import { loadDatabaseUrl } from './mig-env.mjs';
 
-function loadDevVars() {
-  const vars = {};
-  for (const line of readFileSync(new URL('./.dev.vars', import.meta.url), 'utf8').split(/\r?\n/)) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m) vars[m[1]] = m[2].replace(/^["']|["']$/g, '');
-  }
-  return vars;
-}
-
-const { DATABASE_URL } = loadDevVars();
-if (!DATABASE_URL) {
-  console.error('DATABASE_URL missing from api/.dev.vars');
-  process.exit(1);
-}
-
-const sql = neon(DATABASE_URL);
+const sql = neon(loadDatabaseUrl());
 const statements = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
   .split(/;\s*$/m)
   .map((s) => s.replace(/^\s*--.*$/gm, '').trim())

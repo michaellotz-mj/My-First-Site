@@ -9,6 +9,7 @@ import {
   splitCompleted,
   subcategoryProgress,
   updateActivityInBoard,
+  updateSubcategoryInBoard,
 } from './progress';
 
 const act = (id: number, done: boolean) => ({ id, title: `a${id}`, done });
@@ -25,9 +26,9 @@ describe('activityProgress', () => {
 describe('subcategoryProgress', () => {
   it('counts sub-categories whose activities are all ticked', () => {
     const subs = [
-      { id: 1, name: 'Done', activities: [act(1, true)] },
-      { id: 2, name: 'Open', activities: [act(2, false)] },
-      { id: 3, name: 'Empty', activities: [] },
+      { id: 1, name: 'Done', notes: '', activities: [act(1, true)] },
+      { id: 2, name: 'Open', notes: '', activities: [act(2, false)] },
+      { id: 3, name: 'Empty', notes: '', activities: [] },
     ];
     expect(subcategoryProgress(subs)).toEqual({ done: 1, total: 3, complete: false });
   });
@@ -36,7 +37,7 @@ describe('subcategoryProgress', () => {
 describe('updateActivityInBoard', () => {
   it('changes only the matching activity and leaves the input untouched', () => {
     const board = [
-      { key: 'work' as const, label: 'Work', subcategories: [{ id: 1, name: 'S', activities: [act(1, false), act(2, false)] }] },
+      { key: 'work' as const, label: 'Work', subcategories: [{ id: 1, name: 'S', notes: '', activities: [act(1, false), act(2, false)] }] },
     ];
     const next = updateActivityInBoard(board, 2, { done: true });
     expect(next[0].subcategories[0].activities).toEqual([act(1, false), act(2, true)]);
@@ -52,7 +53,7 @@ describe('categoriesForTab', () => {
     expect(categoriesForTab(board, 'business').map((c) => c.key)).toEqual(['business']));
 });
 
-const sub = (id: number, ...done: boolean[]) => ({ id, name: `s${id}`, activities: done.map((d, i) => act(id * 10 + i, d)) });
+const sub = (id: number, ...done: boolean[]) => ({ id, name: `s${id}`, notes: '', activities: done.map((d, i) => act(id * 10 + i, d)) });
 
 describe('splitCompleted', () => {
   it('moves fully ticked sub-categories out, keeps empty and partial ones in progress', () => {
@@ -104,5 +105,15 @@ describe('reorderActivitiesInBoard', () => {
     const next = reorderActivitiesInBoard(board, 1, [12, 10, 11]);
     expect(next[0].subcategories[0].activities.map((a) => a.id)).toEqual([12, 10, 11]);
     expect(next[0].subcategories[1]).toBe(board[0].subcategories[1]);
+  });
+});
+
+describe('updateSubcategoryInBoard', () => {
+  it('changes only the matching sub-category', () => {
+    const board = [{ key: 'work' as const, label: 'Work', subcategories: [sub(1), sub(2)] }];
+    const next = updateSubcategoryInBoard(board, 2, { notes: 'Call Sam' });
+    expect(next[0].subcategories[1].notes).toBe('Call Sam');
+    expect(next[0].subcategories[0]).toBe(board[0].subcategories[0]);
+    expect(board[0].subcategories[1].notes).toBe('');
   });
 });

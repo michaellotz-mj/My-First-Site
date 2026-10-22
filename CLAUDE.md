@@ -21,7 +21,7 @@ frontend/
   src/App.tsx              router (Wouter)
   src/pages/Home.tsx       the whole board (one page)
   src/pages/NotFound.tsx
-  src/components/          AddForm, EditableText, CategoryTabs (All / Work / Business / Other), ConfirmDelete (+ .test.tsx), CompletedSection
+  src/components/          AddForm, EditableText, CategoryTabs (All / Work / Business / Other), ConfirmDelete (+ .test.tsx), CompletedSection, NotesDialog (+ .test.tsx)
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
   src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering, completed split, reorder (`moveId`, sub-categories and activities) (+ .test.ts)
   src/lib/storage.ts       loadChoice/saveChoice for remembered UI choices (localStorage, never throws)
@@ -34,7 +34,9 @@ api/
   src/board.ts             pure row → nested board shaping (+ .test.ts)
   src/redact.ts            strips connection strings from logged errors (+ .test.ts)
   schema.sql               reference schema (source of truth)
-  mig-001-init.mjs         creates tables; reads DATABASE_URL from .dev.vars
+  mig-env.mjs              shared loader: DATABASE_URL from .dev.vars for the mig-*.mjs scripts
+  mig-001-init.mjs         creates tables from schema.sql
+  mig-002-subcategory-notes.mjs  adds subcategories.notes (idempotent)
   check-dev-vars.mjs       validates DATABASE_URL shape in .dev.vars without printing it (run in CI)
   integration.test.ts      live tests against wrangler dev
   wrangler.toml            NO secrets; ALLOWED_ORIGINS lives here
@@ -49,10 +51,11 @@ api/
 - Deleting asks inline ("Delete? Yes / No", No focused, Escape cancels) via `ConfirmDelete`, for both activities and sub-categories. No browser `confirm()`: it is blocked in embedded previews.
 - Reorder: ▲▼ buttons on in-progress sub-categories move them within their category (optimistic, then `PUT /api/subcategories/order` with the category's full id order). Completed ones keep their relative order at the end. Activities have the same ▲▼ buttons (shown when a sub-category has 2+ activities) and save via `PUT /api/subcategories/:id/activities/order`.
 - Completed section: fully ticked sub-categories leave their category and appear in one "Completed" section at the bottom of the current tab (tagged with their category, collapsed by default). It can be open, minimised or hidden (`todo-completed-view` in localStorage). Unticking moves a card back.
+- Notes: a note icon on each sub-category (category-coloured and filled when it has notes) opens a modal `<dialog>` with a textarea. Save (or Ctrl/Cmd+Enter) saves; Cancel, Escape or clicking outside discards. Saved optimistically via `PATCH /api/subcategories/:id {notes}`.
 - Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
 
 ## Data model
-- `subcategories(id, category ∈ {work,business,other}, name, position, created_at)`
+- `subcategories(id, category ∈ {work,business,other}, name, notes (≤10,000 chars, default ''), position, created_at)`
 - `activities(id, subcategory_id → subcategories ON DELETE CASCADE, title, done, done_at, position, created_at)`
 - Categories are a CHECK constraint, not a table — they are fixed by design.
 
@@ -62,7 +65,7 @@ api/
 | GET | `/api/health` | – | runs `SELECT 1` (CI waits on this) |
 | GET | `/api/board` | – | all 3 categories, always, with nested sub-categories/activities |
 | POST | `/api/subcategories` | `{category, name}` | 201 |
-| PATCH | `/api/subcategories/:id` | `{name}` | full update (name is the only field) |
+| PATCH | `/api/subcategories/:id` | `{name?, notes?}` | **partial** — omitted fields kept via `COALESCE`; empty notes clears them |
 | PUT | `/api/subcategories/order` | `{category, ids}` | sets `position` = index; ids from other categories ignored |
 | DELETE | `/api/subcategories/:id` | – | cascades to activities |
 | POST | `/api/subcategories/:id/activities` | `{title}` | 404 if sub-category missing |
@@ -80,6 +83,12 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 5. **Cloudflare dashboard** → Workers → `todo-api` → Settings → Variables and Secrets → add `DATABASE_URL` as type **Secret** (the `production` branch URL). Create the tables on `production` once by pasting `api/schema.sql` into the Neon SQL Editor with `production` selected.
 6. **Frontend**: create `frontend/.env.production` (gitignored) with `VITE_API_URL=https://todo-api.<you>.workers.dev`, then `cd frontend && npm ci && npm run deploy`. Note the frontend URL.
 7. Put the frontend URL in `api/wrangler.toml` → `ALLOWED_ORIGINS`, then redeploy the API (with the secret check below).
+
+## Migrations
+- `schema.sql` is the full current schema (used by `mig-001` for a brand-new database). Each later change gets an idempotent `mig-NNN-*.mjs`.
+- CI runs every `mig-[0-9]*.mjs` in order against the `dev` branch before the integration tests, so dev stays current automatically.
+- **Production is never migrated automatically.** Ask Michael first, then run the new migration's SQL in the Neon SQL Editor with `production` selected (or run the script with `.dev.vars` temporarily pointing at production), *before* deploying the API that needs it.
+- Pending for production: `mig-002` (`ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000)`) — only needed if production tables were created before 2026-10-22.
 
 ## Deploy rules
 - **Before every `npx wrangler deploy` in `api/`: run `npx wrangler secret list` and confirm `DATABASE_URL` is listed. If `[]`, STOP.** (Exception: step 4 above, the very first deploy.)
@@ -109,6 +118,7 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 - Authentication (see Security).
 
 ## Change log
+- **2026-10-22** — Notes on sub-categories (note icon + pop-up). **Schema change:** `subcategories.notes` via `mig-002`; CI now applies migrations to dev. PATCH sub-category is now partial (`name?`, `notes?`).
 - **2026-10-21** — Reorder activities within a sub-category (▲▼, new `PUT /api/subcategories/:id/activities/order`, no schema change).
 - **2026-10-21** — Reorder sub-categories (▲▼, new `PUT /api/subcategories/order`, no schema change); completed sub-categories move to a Completed section that can be minimised or hidden. Fixed: API now parses PUT bodies.
 - **2026-10-21** — Inline "are you sure?" before deleting activities and sub-categories.

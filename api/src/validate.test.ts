@@ -31,9 +31,21 @@ describe('parseNewSubcategory', () => {
 });
 
 describe('parseSubcategoryUpdate', () => {
-  it('requires a name', () => expect(parseSubcategoryUpdate({}).ok).toBe(false));
-  it('accepts a new name', () =>
-    expect(parseSubcategoryUpdate({ name: 'Renamed' })).toEqual({ ok: true, value: { name: 'Renamed' } }));
+  it('rejects an empty update', () => expect(parseSubcategoryUpdate({}).ok).toBe(false));
+  it('accepts a new name, leaving notes unchanged', () =>
+    expect(parseSubcategoryUpdate({ name: 'Renamed' })).toEqual({ ok: true, value: { name: 'Renamed', notes: null } }));
+  it('accepts notes as written, including line breaks', () =>
+    expect(parseSubcategoryUpdate({ notes: '  Call Sam\n- ask about v2 ' })).toEqual({
+      ok: true,
+      value: { name: null, notes: '  Call Sam\n- ask about v2 ' },
+    }));
+  it('accepts empty notes (clears them)', () =>
+    expect(parseSubcategoryUpdate({ notes: '' })).toEqual({ ok: true, value: { name: null, notes: '' } }));
+  it('rejects a blank name and non-string or over-long notes', () => {
+    expect(parseSubcategoryUpdate({ name: ' ' }).ok).toBe(false);
+    expect(parseSubcategoryUpdate({ notes: 5 }).ok).toBe(false);
+    expect(parseSubcategoryUpdate({ notes: 'x'.repeat(10001) }).ok).toBe(false);
+  });
 });
 
 describe('parseNewActivity', () => {

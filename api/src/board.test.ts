@@ -9,9 +9,9 @@ describe('buildBoard', () => {
   it('nests activities under their subcategory, ordered by position', () => {
     const board = buildBoard(
       [
-        { id: 2, category: 'work', name: 'B', position: 2 },
-        { id: 1, category: 'work', name: 'A', position: 1 },
-        { id: 3, category: 'other', name: 'C', position: 1 },
+        { id: 2, category: 'work', name: 'B', notes: '', position: 2 },
+        { id: 1, category: 'work', name: 'A', notes: '', position: 1 },
+        { id: 3, category: 'other', name: 'C', notes: '', position: 1 },
       ],
       [
         { id: 11, subcategory_id: 1, title: 'second', done: true, position: 2 },

@@ -53,6 +53,9 @@ jobs:
           esac
           node check-dev-vars.mjs
 
+      - name: Apply migrations to the dev database
+        run: for f in mig-[0-9]*.mjs; do echo "== $f"; node "$f"; done
+
       - name: Start wrangler dev
         run: |
           npx wrangler dev --port 8787 > wrangler.log 2>&1 &

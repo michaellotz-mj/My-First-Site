@@ -37,12 +37,28 @@ export function parseNewSubcategory(body: unknown): Result<{ category: Category;
   return ok({ category: body.category as Category, name: name.value });
 }
 
-/** Partial update: only `name` is editable. */
-export function parseSubcategoryUpdate(body: unknown): Result<{ name: string }> {
+export const MAX_NOTES = 10000;
+
+/**
+ * Partial update: send `name`, `notes`, or both. Omitted fields come back as null so the SQL can
+ * COALESCE them. Notes may be empty (clears them) and keep their whitespace and line breaks.
+ */
+export function parseSubcategoryUpdate(body: unknown): Result<{ name: string | null; notes: string | null }> {
   if (!isObject(body)) return fail('body must be a JSON object');
-  const name = text(body.name, 'name', 200);
-  if (!name.ok) return name;
-  return ok({ name: name.value });
+  let name: string | null = null;
+  let notes: string | null = null;
+  if (body.name !== undefined) {
+    const n = text(body.name, 'name', 200);
+    if (!n.ok) return n;
+    name = n.value;
+  }
+  if (body.notes !== undefined) {
+    if (typeof body.notes !== 'string') return fail('notes must be a string');
+    if (body.notes.length > MAX_NOTES) return fail(`notes must be at most ${MAX_NOTES} characters`);
+    notes = body.notes;
+  }
+  if (name === null && notes === null) return fail('send at least one of: name, notes');
+  return ok({ name, notes });
 }
 
 /** A non-empty list of unique positive ids, top first. */

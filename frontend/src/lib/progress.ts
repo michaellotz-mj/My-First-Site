@@ -95,3 +95,15 @@ export function reorderActivitiesInBoard(board: CategoryBoard[], subcategoryId: 
     ),
   }));
 }
+
+/** Returns a new board with one sub-category's fields changed (optimistic rename / notes save). */
+export function updateSubcategoryInBoard(
+  board: CategoryBoard[],
+  id: number,
+  changes: Partial<Pick<Subcategory, 'name' | 'notes'>>,
+): CategoryBoard[] {
+  return board.map((c) => ({
+    ...c,
+    subcategories: c.subcategories.map((s) => (s.id === id ? { ...s, ...changes } : s)),
+  }));
+}

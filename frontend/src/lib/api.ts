@@ -21,8 +21,8 @@ export const api = {
   board: () => request<CategoryBoard[]>('GET', '/api/board'),
   createSubcategory: (category: CategoryKey, name: string) =>
     request<Subcategory>('POST', '/api/subcategories', { category, name }),
-  renameSubcategory: (id: number, name: string) =>
-    request<Subcategory>('PATCH', `/api/subcategories/${id}`, { name }),
+  updateSubcategory: (id: number, changes: { name?: string; notes?: string }) =>
+    request<Subcategory>('PATCH', `/api/subcategories/${id}`, changes),
   reorderSubcategories: (category: CategoryKey, ids: number[]) =>
     request<{ ok: true }>('PUT', '/api/subcategories/order', { category, ids }),
   deleteSubcategory: (id: number) => request<{ ok: true }>('DELETE', `/api/subcategories/${id}`),

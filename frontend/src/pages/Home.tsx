@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, StickyNote } from 'lucide-react';
 import AddForm from '../components/AddForm';
 import CategoryTabs from '../components/CategoryTabs';
 import CompletedSection, { COMPLETED_VIEWS, type CompletedView } from '../components/CompletedSection';
 import ConfirmDelete from '../components/ConfirmDelete';
 import EditableText from '../components/EditableText';
+import NotesDialog from '../components/NotesDialog';
 import { api } from '../lib/api';
 import { CATEGORY_STYLES } from '../lib/categoryStyles';
 import {
@@ -17,6 +18,7 @@ import {
   splitCompleted,
   subcategoryProgress,
   updateActivityInBoard,
+  updateSubcategoryInBoard,
   type Tab,
 } from '../lib/progress';
 import { loadChoice, saveChoice } from '../lib/storage';
@@ -102,6 +104,15 @@ export default function Home() {
     [mutate],
   );
 
+  /** Saves notes instantly on screen, then to the API; reload corrects it if the save fails. */
+  const saveNotes = useCallback(
+    (id: number, notes: string) => {
+      setBoard((b) => b && updateSubcategoryInBoard(b, id, { notes }));
+      return mutate(() => api.updateSubcategory(id, { notes }));
+    },
+    [mutate],
+  );
+
   const visible = board ? categoriesForTab(board, tab) : [];
   const completed = visible.flatMap((c) =>
     splitCompleted(c.subcategories).completed.map((sub) => ({ sub, category: c })),
@@ -157,6 +168,7 @@ export default function Home() {
                       mutate={mutate}
                       onToggle={toggleActivity}
                       onMoveActivity={moveActivity}
+                      onSaveNotes={saveNotes}
                       onMoveUp={i > 0 ? () => moveSub(category.key, category.subcategories, sub.id, 'up') : undefined}
                       onMoveDown={
                         i < active.length - 1
@@ -185,6 +197,7 @@ export default function Home() {
                 mutate={mutate}
                 onToggle={toggleActivity}
                 onMoveActivity={moveActivity}
+                onSaveNotes={saveNotes}
               />
             ))}
           </CompletedSection>
@@ -200,6 +213,7 @@ interface CardProps {
   mutate: (change: () => Promise<unknown>) => Promise<void>;
   onToggle: (id: number, done: boolean) => Promise<void>;
   onMoveActivity: (sub: Subcategory, id: number, direction: 'up' | 'down') => void;
+  onSaveNotes: (id: number, notes: string) => void;
   /** Present only when the card can move that way (in-progress cards, not at that end). */
   onMoveUp?: () => void;
   onMoveDown?: () => void;
@@ -214,6 +228,7 @@ function SubcategoryCard({
   mutate,
   onToggle,
   onMoveActivity,
+  onSaveNotes,
   onMoveUp,
   onMoveDown,
   categoryLabel,
@@ -221,6 +236,8 @@ function SubcategoryCard({
 }: CardProps) {
   const [open, setOpen] = useState(defaultOpen);
   const reorderable = onMoveUp || onMoveDown;
+  const [notesOpen, setNotesOpen] = useState(false);
+  const hasNotes = sub.notes.trim() !== '';
   const progress = activityProgress(sub.activities);
   const styles = CATEGORY_STYLES[category];
   const percent = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
@@ -241,8 +258,25 @@ function SubcategoryCard({
           struck={progress.complete}
           label={sub.name}
           className="font-medium"
-          onSave={(name) => mutate(() => api.renameSubcategory(sub.id, name))}
+          onSave={(name) => mutate(() => api.updateSubcategory(sub.id, { name }))}
         />
+        <button
+          type="button"
+          aria-label={hasNotes ? `Notes for ${sub.name} (has notes)` : `Add notes for ${sub.name}`}
+          title={hasNotes ? 'View notes' : 'Add notes'}
+          onClick={() => setNotesOpen(true)}
+          className={`shrink-0 rounded p-1 hover:bg-slate-100 ${hasNotes ? styles.text : 'text-slate-300 hover:text-slate-600'}`}
+        >
+          <StickyNote size={15} fill={hasNotes ? 'currentColor' : 'none'} fillOpacity={0.15} />
+        </button>
+        {notesOpen && (
+          <NotesDialog
+            title={sub.name}
+            notes={sub.notes}
+            onSave={(notes) => onSaveNotes(sub.id, notes)}
+            onClose={() => setNotesOpen(false)}
+          />
+        )}
         {categoryLabel && (
           <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${styles.pill}`}>{categoryLabel}</span>
         )}

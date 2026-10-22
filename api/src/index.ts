@@ -62,7 +62,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/api\/board$/,
     handler: async ({ sql }) => {
       const [subs, acts] = await Promise.all([
-        sql`SELECT id, category, name, position FROM subcategories`,
+        sql`SELECT id, category, name, notes, position FROM subcategories`,
         sql`SELECT id, subcategory_id, title, done, position FROM activities`,
       ]);
       return json(buildBoard(subs as SubcategoryRow[], acts as ActivityRow[]));
@@ -77,7 +77,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
           INSERT INTO subcategories (category, name, position)
           VALUES (${category}, ${name},
             (SELECT COALESCE(MAX(position), 0) + 1 FROM subcategories WHERE category = ${category}))
-          RETURNING id, category, name`;
+          RETURNING id, category, name, notes`;
         return json({ ...rows[0], activities: [] }, 201);
       }),
   },
@@ -99,10 +99,14 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/api\/subcategories\/(\w+)$/,
     handler: ({ sql, params, body }) =>
       validated(parseId(params[0]), (id) =>
-        validated(parseSubcategoryUpdate(body), async ({ name }) => {
+        // Partial update: null fields keep their current value.
+        validated(parseSubcategoryUpdate(body), async ({ name, notes }) => {
           const rows = await sql`
-            UPDATE subcategories SET name = ${name} WHERE id = ${id}
-            RETURNING id, category, name`;
+            UPDATE subcategories SET
+              name = COALESCE(${name}::text, name),
+              notes = COALESCE(${notes}::text, notes)
+            WHERE id = ${id}
+            RETURNING id, category, name, notes`;
           return rows.length ? json(rows[0]) : notFound();
         }),
       ),
