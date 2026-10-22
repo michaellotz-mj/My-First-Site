@@ -27,26 +27,31 @@ export function parseId(raw: string): Result<number> {
   return id > 0 ? ok(id) : fail('invalid id');
 }
 
-export function parseNewSubcategory(body: unknown): Result<{ category: Category; name: string }> {
+/** `today` is optional: true also puts the new sub-category on the Today list. */
+export function parseNewSubcategory(body: unknown): Result<{ category: Category; name: string; today: boolean }> {
   if (!isObject(body)) return fail('body must be a JSON object');
   if (!CATEGORIES.includes(body.category as Category)) {
     return fail(`category must be one of: ${CATEGORIES.join(', ')}`);
   }
   const name = text(body.name, 'name', 200);
   if (!name.ok) return name;
-  return ok({ category: body.category as Category, name: name.value });
+  if (body.today !== undefined && typeof body.today !== 'boolean') return fail('today must be a boolean');
+  return ok({ category: body.category as Category, name: name.value, today: body.today === true });
 }
 
 export const MAX_NOTES = 10000;
 
 /**
- * Partial update: send `name`, `notes`, or both. Omitted fields come back as null so the SQL can
- * COALESCE them. Notes may be empty (clears them) and keep their whitespace and line breaks.
+ * Partial update: send any of `name`, `notes`, `today`. Omitted fields come back as null so the SQL
+ * can COALESCE them. Notes may be empty (clears them) and keep their whitespace and line breaks.
  */
-export function parseSubcategoryUpdate(body: unknown): Result<{ name: string | null; notes: string | null }> {
+export function parseSubcategoryUpdate(
+  body: unknown,
+): Result<{ name: string | null; notes: string | null; today: boolean | null }> {
   if (!isObject(body)) return fail('body must be a JSON object');
   let name: string | null = null;
   let notes: string | null = null;
+  let today: boolean | null = null;
   if (body.name !== undefined) {
     const n = text(body.name, 'name', 200);
     if (!n.ok) return n;
@@ -57,8 +62,12 @@ export function parseSubcategoryUpdate(body: unknown): Result<{ name: string | n
     if (body.notes.length > MAX_NOTES) return fail(`notes must be at most ${MAX_NOTES} characters`);
     notes = body.notes;
   }
-  if (name === null && notes === null) return fail('send at least one of: name, notes');
-  return ok({ name, notes });
+  if (body.today !== undefined) {
+    if (typeof body.today !== 'boolean') return fail('today must be a boolean');
+    today = body.today;
+  }
+  if (name === null && notes === null && today === null) return fail('send at least one of: name, notes, today');
+  return ok({ name, notes, today });
 }
 
 /** A non-empty list of unique positive ids, top first. */
@@ -79,6 +88,14 @@ export function parseReorder(body: unknown): Result<{ category: Category; ids: n
   const ids = idList(body.ids);
   if (!ids.ok) return ids;
   return ok({ category: body.category as Category, ids: ids.value });
+}
+
+/** Full new order of the Today list, top first. */
+export function parseTodayReorder(body: unknown): Result<{ ids: number[] }> {
+  if (!isObject(body)) return fail('body must be a JSON object');
+  const ids = idList(body.ids);
+  if (!ids.ok) return ids;
+  return ok({ ids: ids.value });
 }
 
 /** Full new order of one sub-category's activities, top first. */

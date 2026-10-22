@@ -9,6 +9,7 @@ import {
   parseNewSubcategory,
   parseReorder,
   parseSubcategoryUpdate,
+  parseTodayReorder,
   type Result,
 } from './validate';
 
@@ -62,7 +63,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/api\/board$/,
     handler: async ({ sql }) => {
       const [subs, acts] = await Promise.all([
-        sql`SELECT id, category, name, notes, position FROM subcategories`,
+        sql`SELECT id, category, name, notes, position, today, today_position FROM subcategories`,
         sql`SELECT id, subcategory_id, title, done, position FROM activities`,
       ]);
       return json(buildBoard(subs as SubcategoryRow[], acts as ActivityRow[]));
@@ -72,13 +73,28 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: 'POST',
     pattern: /^\/api\/subcategories$/,
     handler: ({ sql, body }) =>
-      validated(parseNewSubcategory(body), async ({ category, name }) => {
+      validated(parseNewSubcategory(body), async ({ category, name, today }) => {
         const rows = await sql`
-          INSERT INTO subcategories (category, name, position)
+          INSERT INTO subcategories (category, name, position, today, today_position)
           VALUES (${category}, ${name},
-            (SELECT COALESCE(MAX(position), 0) + 1 FROM subcategories WHERE category = ${category}))
-          RETURNING id, category, name, notes`;
+            (SELECT COALESCE(MAX(position), 0) + 1 FROM subcategories WHERE category = ${category}),
+            ${today},
+            (SELECT COALESCE(MAX(today_position), 0) + 1 FROM subcategories WHERE today))
+          RETURNING id, category, name, notes, today, today_position AS "todayPosition"`;
         return json({ ...rows[0], activities: [] }, 201);
+      }),
+  },
+  {
+    method: 'PUT',
+    pattern: /^\/api\/today\/order$/,
+    handler: ({ sql, body }) =>
+      validated(parseTodayReorder(body), async ({ ids }) => {
+        // Today position = index in the list. Ids not on Today are ignored.
+        await sql`
+          UPDATE subcategories s SET today_position = o.ord
+          FROM unnest(${ids}::int[]) WITH ORDINALITY AS o(id, ord)
+          WHERE s.id = o.id AND s.today`;
+        return json({ ok: true });
       }),
   },
   {
@@ -100,13 +116,20 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: ({ sql, params, body }) =>
       validated(parseId(params[0]), (id) =>
         // Partial update: null fields keep their current value.
-        validated(parseSubcategoryUpdate(body), async ({ name, notes }) => {
+        validated(parseSubcategoryUpdate(body), async ({ name, notes, today }) => {
+          // Joining Today puts it at the bottom of the Today list.
           const rows = await sql`
             UPDATE subcategories SET
               name = COALESCE(${name}::text, name),
-              notes = COALESCE(${notes}::text, notes)
+              notes = COALESCE(${notes}::text, notes),
+              today_position = CASE
+                WHEN ${today}::boolean AND NOT today
+                  THEN (SELECT COALESCE(MAX(today_position), 0) + 1 FROM subcategories WHERE today)
+                ELSE today_position
+              END,
+              today = COALESCE(${today}::boolean, today)
             WHERE id = ${id}
-            RETURNING id, category, name, notes`;
+            RETURNING id, category, name, notes, today, today_position AS "todayPosition"`;
           return rows.length ? json(rows[0]) : notFound();
         }),
       ),

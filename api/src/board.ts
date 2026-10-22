@@ -13,6 +13,8 @@ export interface SubcategoryRow {
   name: string;
   notes: string;
   position: number;
+  today: boolean;
+  today_position: number;
 }
 
 export interface ActivityRow {
@@ -33,6 +35,8 @@ export interface Subcategory {
   id: number;
   name: string;
   notes: string;
+  today: boolean;
+  todayPosition: number;
   activities: Activity[];
 }
 
@@ -59,6 +63,13 @@ export function buildBoard(subs: SubcategoryRow[], acts: ActivityRow[]): Categor
     subcategories: subs
       .filter((s) => s.category === key)
       .sort(byPosition)
-      .map((s) => ({ id: s.id, name: s.name, notes: s.notes, activities: activitiesBySub.get(s.id) ?? [] })),
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        notes: s.notes,
+        today: s.today,
+        todayPosition: s.today_position,
+        activities: activitiesBySub.get(s.id) ?? [],
+      })),
   }));
 }

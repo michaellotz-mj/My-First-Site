@@ -4,6 +4,9 @@ import {
   categoriesForTab,
   moveIdTo,
   moveSubcategory,
+  nextTodayPosition,
+  reorderTodayInBoard,
+  todayItems,
   reorderActivitiesInBoard,
   reorderInBoard,
   splitCompleted,
@@ -26,9 +29,9 @@ describe('activityProgress', () => {
 describe('subcategoryProgress', () => {
   it('counts sub-categories whose activities are all ticked', () => {
     const subs = [
-      { id: 1, name: 'Done', notes: '', activities: [act(1, true)] },
-      { id: 2, name: 'Open', notes: '', activities: [act(2, false)] },
-      { id: 3, name: 'Empty', notes: '', activities: [] },
+      { id: 1, name: 'Done', notes: '', today: false, todayPosition: 0, activities: [act(1, true)] },
+      { id: 2, name: 'Open', notes: '', today: false, todayPosition: 0, activities: [act(2, false)] },
+      { id: 3, name: 'Empty', notes: '', today: false, todayPosition: 0, activities: [] },
     ];
     expect(subcategoryProgress(subs)).toEqual({ done: 1, total: 3, complete: false });
   });
@@ -37,7 +40,7 @@ describe('subcategoryProgress', () => {
 describe('updateActivityInBoard', () => {
   it('changes only the matching activity and leaves the input untouched', () => {
     const board = [
-      { key: 'work' as const, label: 'Work', subcategories: [{ id: 1, name: 'S', notes: '', activities: [act(1, false), act(2, false)] }] },
+      { key: 'work' as const, label: 'Work', subcategories: [{ id: 1, name: 'S', notes: '', today: false, todayPosition: 0, activities: [act(1, false), act(2, false)] }] },
     ];
     const next = updateActivityInBoard(board, 2, { done: true });
     expect(next[0].subcategories[0].activities).toEqual([act(1, false), act(2, true)]);
@@ -53,7 +56,7 @@ describe('categoriesForTab', () => {
     expect(categoriesForTab(board, 'business').map((c) => c.key)).toEqual(['business']));
 });
 
-const sub = (id: number, ...done: boolean[]) => ({ id, name: `s${id}`, notes: '', activities: done.map((d, i) => act(id * 10 + i, d)) });
+const sub = (id: number, ...done: boolean[]) => ({ id, name: `s${id}`, notes: '', today: false, todayPosition: 0, activities: done.map((d, i) => act(id * 10 + i, d)) });
 
 describe('splitCompleted', () => {
   it('moves fully ticked sub-categories out, keeps empty and partial ones in progress', () => {
@@ -114,4 +117,25 @@ describe('updateSubcategoryInBoard', () => {
     expect(next[0].subcategories[0]).toBe(board[0].subcategories[0]);
     expect(board[0].subcategories[1].notes).toBe('');
   });
+});
+
+describe('Today', () => {
+  const onToday = (id: number, todayPosition: number) => ({ ...sub(id), today: true, todayPosition });
+  const board = [
+    { key: 'work' as const, label: 'Work', subcategories: [onToday(1, 2), sub(2)] },
+    { key: 'other' as const, label: 'Other', subcategories: [onToday(3, 1)] },
+  ];
+  it('collects Today items from every category, in Today order, with their category', () =>
+    expect(todayItems(board).map((i) => [i.sub.id, i.category.key])).toEqual([
+      [3, 'other'],
+      [1, 'work'],
+    ]));
+  it('puts a newly added item after everything already on Today', () => expect(nextTodayPosition(board)).toBe(3));
+  it('starts at 1 when Today is empty', () => expect(nextTodayPosition([])).toBe(1));
+  it('reorders Today without touching category order', () => {
+    const next = reorderTodayInBoard(board, [1, 3]);
+    expect(todayItems(next).map((i) => i.sub.id)).toEqual([1, 3]);
+    expect(next[0].subcategories.map((s) => s.id)).toEqual([1, 2]);
+  });
+  it('the All tab is unaffected by Today', () => expect(categoriesForTab(board, 'all')).toBe(board));
 });

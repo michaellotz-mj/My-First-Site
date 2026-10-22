@@ -93,6 +93,23 @@ describe('To Do API', () => {
     expect(order).toEqual([b.id, a.id]);
   });
 
+  it('adds to Today (at the bottom), reorders Today, and removes from Today', async () => {
+    const { data: fresh } = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} today`, today: true });
+    extraIds.push(fresh.id);
+    expect(fresh).toMatchObject({ today: true });
+    const added = await api('PATCH', `/api/subcategories/${subId}`, { today: true });
+    expect(added.data.today).toBe(true);
+    expect(added.data.todayPosition).toBeGreaterThan(fresh.todayPosition);
+    await api('PUT', '/api/today/order', { ids: [subId, fresh.id] });
+    const { data: board } = await api('GET', '/api/board');
+    const all = board.flatMap((c: any) => c.subcategories);
+    const mine = all.find((s: any) => s.id === subId);
+    const theirs = all.find((s: any) => s.id === fresh.id);
+    expect(mine.todayPosition).toBeLessThan(theirs.todayPosition);
+    const removed = await api('PATCH', `/api/subcategories/${subId}`, { today: false });
+    expect(removed.data.today).toBe(false);
+  });
+
   it('rejects invalid input with 400 and unknown ids with 404', async () => {
     expect((await api('POST', '/api/subcategories', { category: 'nope', name: 'x' })).status).toBe(400);
     expect((await api('PATCH', '/api/activities/abc', { done: true })).status).toBe(400);

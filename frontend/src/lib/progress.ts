@@ -35,11 +35,38 @@ export function updateActivityInBoard(
   }));
 }
 
-export type Tab = 'all' | CategoryKey;
+export type Tab = 'today' | 'all' | CategoryKey;
 
-/** Categories shown for the selected tab: every category for "all", otherwise just that one. */
+/** Categories shown for the selected tab: every category for "all", none for "today", otherwise just that one. */
 export function categoriesForTab(board: CategoryBoard[], tab: Tab): CategoryBoard[] {
   return tab === 'all' ? board : board.filter((c) => c.key === tab);
+}
+
+/** A sub-category with the category it lives in, for lists that mix categories (Today, Completed). */
+export interface PlacedSubcategory {
+  sub: Subcategory;
+  category: CategoryBoard;
+}
+
+/** Everything on the Today list, in Today order. */
+export function todayItems(board: CategoryBoard[]): PlacedSubcategory[] {
+  return board
+    .flatMap((category) => category.subcategories.filter((s) => s.today).map((sub) => ({ sub, category })))
+    .sort((a, b) => a.sub.todayPosition - b.sub.todayPosition || a.sub.id - b.sub.id);
+}
+
+/** Returns a new board with Today positions set from the given id order (optimistic reorder). */
+export function reorderTodayInBoard(board: CategoryBoard[], ids: number[]): CategoryBoard[] {
+  const rank = new Map(ids.map((id, i) => [id, i + 1]));
+  return board.map((c) => ({
+    ...c,
+    subcategories: c.subcategories.map((s) => (rank.has(s.id) ? { ...s, todayPosition: rank.get(s.id)! } : s)),
+  }));
+}
+
+/** Position for a sub-category joining Today: after everything already there. */
+export function nextTodayPosition(board: CategoryBoard[]): number {
+  return Math.max(0, ...board.flatMap((c) => c.subcategories.filter((s) => s.today).map((s) => s.todayPosition))) + 1;
 }
 
 /** Splits sub-categories into those still in progress and those with every activity ticked, keeping order. */
@@ -102,7 +129,7 @@ export function reorderActivitiesInBoard(board: CategoryBoard[], subcategoryId: 
 export function updateSubcategoryInBoard(
   board: CategoryBoard[],
   id: number,
-  changes: Partial<Pick<Subcategory, 'name' | 'notes'>>,
+  changes: Partial<Pick<Subcategory, 'name' | 'notes' | 'today' | 'todayPosition'>>,
 ): CategoryBoard[] {
   return board.map((c) => ({
     ...c,

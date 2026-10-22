@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS subcategories (
   name        TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 200),
   notes       TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000),
   position    INTEGER NOT NULL DEFAULT 0,
+  -- In the "Today" list, and its place there (separate from position within the category).
+  today           BOOLEAN NOT NULL DEFAULT false,
+  today_position  INTEGER NOT NULL DEFAULT 0,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

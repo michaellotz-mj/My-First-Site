@@ -7,6 +7,7 @@ import {
   parseNewSubcategory,
   parseReorder,
   parseSubcategoryUpdate,
+  parseTodayReorder,
 } from './validate';
 
 describe('parseId', () => {
@@ -19,7 +20,7 @@ describe('parseNewSubcategory', () => {
   it('trims the name', () =>
     expect(parseNewSubcategory({ category: 'work', name: '  Screening V2 config ' })).toEqual({
       ok: true,
-      value: { category: 'work', name: 'Screening V2 config' },
+      value: { category: 'work', name: 'Screening V2 config', today: false },
     }));
   it('rejects unknown categories', () =>
     expect(parseNewSubcategory({ category: 'home', name: 'x' }).ok).toBe(false));
@@ -33,14 +34,14 @@ describe('parseNewSubcategory', () => {
 describe('parseSubcategoryUpdate', () => {
   it('rejects an empty update', () => expect(parseSubcategoryUpdate({}).ok).toBe(false));
   it('accepts a new name, leaving notes unchanged', () =>
-    expect(parseSubcategoryUpdate({ name: 'Renamed' })).toEqual({ ok: true, value: { name: 'Renamed', notes: null } }));
+    expect(parseSubcategoryUpdate({ name: 'Renamed' })).toEqual({ ok: true, value: { name: 'Renamed', notes: null, today: null } }));
   it('accepts notes as written, including line breaks', () =>
     expect(parseSubcategoryUpdate({ notes: '  Call Sam\n- ask about v2 ' })).toEqual({
       ok: true,
-      value: { name: null, notes: '  Call Sam\n- ask about v2 ' },
+      value: { name: null, notes: '  Call Sam\n- ask about v2 ', today: null },
     }));
   it('accepts empty notes (clears them)', () =>
-    expect(parseSubcategoryUpdate({ notes: '' })).toEqual({ ok: true, value: { name: null, notes: '' } }));
+    expect(parseSubcategoryUpdate({ notes: '' })).toEqual({ ok: true, value: { name: null, notes: '', today: null } }));
   it('rejects a blank name and non-string or over-long notes', () => {
     expect(parseSubcategoryUpdate({ name: ' ' }).ok).toBe(false);
     expect(parseSubcategoryUpdate({ notes: 5 }).ok).toBe(false);
@@ -84,4 +85,24 @@ describe('parseActivityReorder', () => {
     expect(parseActivityReorder({ ids: [2, 1] })).toEqual({ ok: true, value: { ids: [2, 1] } }));
   it.each([[{}], [{ ids: [] }], [{ ids: [1, 1] }], [{ ids: [-1] }], [null]])('rejects %j', (body) =>
     expect(parseActivityReorder(body).ok).toBe(false));
+});
+
+describe('Today', () => {
+  it('new sub-categories can go straight onto Today', () =>
+    expect(parseNewSubcategory({ category: 'other', name: 'Gym', today: true })).toEqual({
+      ok: true,
+      value: { category: 'other', name: 'Gym', today: true },
+    }));
+  it('rejects a non-boolean today', () => {
+    expect(parseNewSubcategory({ category: 'other', name: 'Gym', today: 'yes' }).ok).toBe(false);
+    expect(parseSubcategoryUpdate({ today: 1 }).ok).toBe(false);
+  });
+  it('accepts adding to and removing from Today', () => {
+    expect(parseSubcategoryUpdate({ today: true })).toEqual({ ok: true, value: { name: null, notes: null, today: true } });
+    expect(parseSubcategoryUpdate({ today: false })).toEqual({ ok: true, value: { name: null, notes: null, today: false } });
+  });
+  it('validates the Today order', () => {
+    expect(parseTodayReorder({ ids: [4, 2] })).toEqual({ ok: true, value: { ids: [4, 2] } });
+    expect(parseTodayReorder({ ids: [] }).ok).toBe(false);
+  });
 });

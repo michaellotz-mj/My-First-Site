@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { X } from 'lucide-react';
+import Modal from './Modal';
 
 const MAX_NOTES = 10000;
 
@@ -13,24 +14,9 @@ interface Props {
 
 /** Modal notes editor. Save keeps the text; Cancel, Escape or clicking outside discards changes. */
 export default function NotesDialog({ title, notes, onSave, onClose }: Props) {
-  const ref = useRef<HTMLDialogElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState(notes);
   const changed = draft !== notes;
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    // jsdom (tests) lacks showModal; fall back to a plain open dialog there.
-    if (typeof dialog.showModal === 'function') dialog.showModal();
-    else dialog.setAttribute('open', '');
-    // showModal focuses the first button; put the cursor at the end of the notes instead.
-    const box = textRef.current;
-    if (box) {
-      box.focus();
-      box.setSelectionRange(box.value.length, box.value.length);
-    }
-  }, []);
 
   function save(e: FormEvent) {
     e.preventDefault();
@@ -39,14 +25,7 @@ export default function NotesDialog({ title, notes, onSave, onClose }: Props) {
   }
 
   return (
-    <dialog
-      ref={ref}
-      aria-labelledby="notes-title"
-      onClose={onClose}
-      onCancel={onClose}
-      onClick={(e) => e.target === ref.current && onClose()}
-      className="m-auto w-[min(36rem,calc(100vw-2rem))] rounded-xl bg-white p-0 text-slate-800 shadow-xl backdrop:bg-slate-900/40"
-    >
+    <Modal labelledBy="notes-title" onClose={onClose} initialFocus={textRef}>
       <form onSubmit={save} className="flex flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -95,6 +74,6 @@ export default function NotesDialog({ title, notes, onSave, onClose }: Props) {
           </div>
         </div>
       </form>
-    </dialog>
+    </Modal>
   );
 }

@@ -11,6 +11,9 @@ export interface Subcategory {
   id: number;
   name: string;
   notes: string;
+  /** On the Today list, and its place there. */
+  today: boolean;
+  todayPosition: number;
   activities: Activity[];
 }
 

@@ -19,10 +19,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   board: () => request<CategoryBoard[]>('GET', '/api/board'),
-  createSubcategory: (category: CategoryKey, name: string) =>
-    request<Subcategory>('POST', '/api/subcategories', { category, name }),
-  updateSubcategory: (id: number, changes: { name?: string; notes?: string }) =>
+  createSubcategory: (category: CategoryKey, name: string, today = false) =>
+    request<Subcategory>('POST', '/api/subcategories', { category, name, today }),
+  updateSubcategory: (id: number, changes: { name?: string; notes?: string; today?: boolean }) =>
     request<Subcategory>('PATCH', `/api/subcategories/${id}`, changes),
+  reorderToday: (ids: number[]) => request<{ ok: true }>('PUT', '/api/today/order', { ids }),
   reorderSubcategories: (category: CategoryKey, ids: number[]) =>
     request<{ ok: true }>('PUT', '/api/subcategories/order', { category, ids }),
   deleteSubcategory: (id: number) => request<{ ok: true }>('DELETE', `/api/subcategories/${id}`),
