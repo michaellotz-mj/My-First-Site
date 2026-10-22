@@ -114,6 +114,7 @@ export default function TodayView({ board, items, actions, onReorder, onCreate, 
         <AddToTodayDialog
           board={board}
           onAdd={(id) => actions.onSetToday(id, true)}
+          onCreate={onCreate}
           onClose={() => setPicking(false)}
         />
       )}
