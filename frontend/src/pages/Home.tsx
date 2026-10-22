@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, StickyNote } from 'lucide-react';
+import { ChevronDown, ChevronRight, StickyNote } from 'lucide-react';
 import AddForm from '../components/AddForm';
 import CategoryTabs from '../components/CategoryTabs';
 import CompletedSection, { COMPLETED_VIEWS, type CompletedView } from '../components/CompletedSection';
 import ConfirmDelete from '../components/ConfirmDelete';
 import EditableText from '../components/EditableText';
 import NotesDialog from '../components/NotesDialog';
+import { SortableItem, SortableList } from '../components/Sortable';
 import { api } from '../lib/api';
 import { CATEGORY_STYLES } from '../lib/categoryStyles';
 import {
   activityProgress,
   categoriesForTab,
-  moveId,
+  moveIdTo,
   moveSubcategory,
   reorderActivitiesInBoard,
   reorderInBoard,
@@ -82,10 +83,10 @@ export default function Home() {
     [mutate],
   );
 
-  /** Moves a sub-category instantly on screen, then saves the category's new order. */
+  /** Applies a dropped sub-category instantly on screen, then saves the category's new order. */
   const moveSub = useCallback(
-    (category: CategoryKey, subcategories: Subcategory[], id: number, direction: 'up' | 'down') => {
-      const ids = moveSubcategory(subcategories, id, direction);
+    (category: CategoryKey, subcategories: Subcategory[], activeId: number, overId: number) => {
+      const ids = moveSubcategory(subcategories, activeId, overId);
       if (!ids) return;
       setBoard((b) => b && reorderInBoard(b, category, ids));
       return mutate(() => api.reorderSubcategories(category, ids));
@@ -93,10 +94,10 @@ export default function Home() {
     [mutate],
   );
 
-  /** Moves an activity instantly on screen, then saves the sub-category's new activity order. */
+  /** Applies a dropped activity instantly on screen, then saves the sub-category's new activity order. */
   const moveActivity = useCallback(
-    (sub: Subcategory, id: number, direction: 'up' | 'down') => {
-      const ids = moveId(sub.activities.map((a) => a.id), id, direction);
+    (sub: Subcategory, activeId: number, overId: number) => {
+      const ids = moveIdTo(sub.activities.map((a) => a.id), activeId, overId);
       if (!ids) return;
       setBoard((b) => b && reorderActivitiesInBoard(b, sub.id, ids));
       return mutate(() => api.reorderActivities(sub.id, ids));
@@ -160,23 +161,35 @@ export default function Home() {
                   {active.length === 0 && progress.total > 0 && (
                     <p className="text-sm text-slate-500">Everything here is done.</p>
                   )}
-                  {active.map((sub, i) => (
-                    <SubcategoryCard
-                      key={sub.id}
-                      sub={sub}
-                      category={category.key}
-                      mutate={mutate}
-                      onToggle={toggleActivity}
-                      onMoveActivity={moveActivity}
-                      onSaveNotes={saveNotes}
-                      onMoveUp={i > 0 ? () => moveSub(category.key, category.subcategories, sub.id, 'up') : undefined}
-                      onMoveDown={
-                        i < active.length - 1
-                          ? () => moveSub(category.key, category.subcategories, sub.id, 'down')
-                          : undefined
-                      }
-                    />
-                  ))}
+                  <SortableList
+                    ids={active.map((s) => s.id)}
+                    nameOf={(id) => active.find((s) => s.id === id)?.name ?? 'sub-category'}
+                    onReorder={(activeId, overId) => moveSub(category.key, category.subcategories, activeId, overId)}
+                  >
+                    <div className="space-y-3">
+                      {active.map((sub) => (
+                        <SortableItem
+                          key={sub.id}
+                          id={sub.id}
+                          handleLabel={`Reorder ${sub.name}`}
+                          disabled={active.length < 2}
+                        >
+                          {(handle, dragging) => (
+                            <SubcategoryCard
+                              sub={sub}
+                              category={category.key}
+                              mutate={mutate}
+                              onToggle={toggleActivity}
+                              onMoveActivity={moveActivity}
+                              onSaveNotes={saveNotes}
+                              handle={handle}
+                              dragging={dragging}
+                            />
+                          )}
+                        </SortableItem>
+                      ))}
+                    </div>
+                  </SortableList>
                   <AddForm
                     placeholder={`New ${category.label} sub-category`}
                     onAdd={(name) => mutate(() => api.createSubcategory(category.key, name))}
@@ -212,11 +225,11 @@ interface CardProps {
   category: CategoryKey;
   mutate: (change: () => Promise<unknown>) => Promise<void>;
   onToggle: (id: number, done: boolean) => Promise<void>;
-  onMoveActivity: (sub: Subcategory, id: number, direction: 'up' | 'down') => void;
+  onMoveActivity: (sub: Subcategory, activeId: number, overId: number) => void;
   onSaveNotes: (id: number, notes: string) => void;
-  /** Present only when the card can move that way (in-progress cards, not at that end). */
-  onMoveUp?: () => void;
-  onMoveDown?: () => void;
+  /** Drag handle for reordering (in-progress cards only). */
+  handle?: ReactNode;
+  dragging?: boolean;
   /** Shown as a small tag, for cards in the mixed Completed section. */
   categoryLabel?: string;
   defaultOpen?: boolean;
@@ -229,13 +242,12 @@ function SubcategoryCard({
   onToggle,
   onMoveActivity,
   onSaveNotes,
-  onMoveUp,
-  onMoveDown,
+  handle,
+  dragging,
   categoryLabel,
   defaultOpen = true,
 }: CardProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const reorderable = onMoveUp || onMoveDown;
   const [notesOpen, setNotesOpen] = useState(false);
   const hasNotes = sub.notes.trim() !== '';
   const progress = activityProgress(sub.activities);
@@ -243,8 +255,11 @@ function SubcategoryCard({
   const percent = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <div
+      className={`rounded-lg border border-slate-200 bg-white p-3 ${dragging ? 'shadow-lg ring-1 ring-slate-300' : 'shadow-sm'}`}
+    >
       <div className="flex items-center gap-1">
+        {handle}
         <button
           type="button"
           onClick={() => setOpen(!open)}
@@ -283,16 +298,6 @@ function SubcategoryCard({
         <span className="shrink-0 text-xs text-slate-500 tabular-nums">
           {progress.done}/{progress.total}
         </span>
-        {reorderable && (
-          <span className="flex shrink-0">
-            <MoveButton label={`Move ${sub.name} up`} onClick={onMoveUp}>
-              <ArrowUp size={14} />
-            </MoveButton>
-            <MoveButton label={`Move ${sub.name} down`} onClick={onMoveDown}>
-              <ArrowDown size={14} />
-            </MoveButton>
-          </span>
-        )}
         <ConfirmDelete
           label={sub.name}
           question={
@@ -309,50 +314,53 @@ function SubcategoryCard({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent}
-        className="mt-2 ml-7 h-1 overflow-hidden rounded-full bg-slate-100"
+        className={`mt-2 h-1 overflow-hidden rounded-full bg-slate-100 ${handle ? 'ml-14' : 'ml-7'}`}
       >
         <div className={`h-full rounded-full transition-[width] ${styles.bar}`} style={{ width: `${percent}%` }} />
       </div>
 
       {open && (
         <div className="mt-2 space-y-1 pl-7">
-          <ul className="space-y-1">
-            {sub.activities.map((a, i) => (
-              <li key={a.id} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={a.done}
-                  onChange={() => onToggle(a.id, !a.done)}
-                  aria-label={`Mark "${a.title}" ${a.done ? 'not done' : 'done'}`}
-                  className={`h-4 w-4 shrink-0 ${styles.check}`}
-                />
-                <EditableText
-                  value={a.title}
-                  struck={a.done}
-                  label={a.title}
-                  className="text-sm"
-                  onSave={(title) => mutate(() => api.updateActivity(a.id, { title }))}
-                />
-                {sub.activities.length > 1 && (
-                  <span className="flex shrink-0">
-                    <MoveButton
-                      label={`Move ${a.title} up`}
-                      onClick={i > 0 ? () => onMoveActivity(sub, a.id, 'up') : undefined}
+          <SortableList
+            ids={sub.activities.map((a) => a.id)}
+            nameOf={(id) => sub.activities.find((a) => a.id === id)?.title ?? 'activity'}
+            onReorder={(activeId, overId) => onMoveActivity(sub, activeId, overId)}
+          >
+            <ul className="space-y-1">
+              {sub.activities.map((a) => (
+                <SortableItem
+                  key={a.id}
+                  id={a.id}
+                  as="li"
+                  handleLabel={`Reorder ${a.title}`}
+                  disabled={sub.activities.length < 2}
+                >
+                  {(activityHandle, activityDragging) => (
+                    <div
+                      className={`flex items-center gap-2 rounded bg-white ${activityDragging ? 'shadow-md ring-1 ring-slate-200' : ''}`}
                     >
-                      <ArrowUp size={14} />
-                    </MoveButton>
-                    <MoveButton
-                      label={`Move ${a.title} down`}
-                      onClick={i < sub.activities.length - 1 ? () => onMoveActivity(sub, a.id, 'down') : undefined}
-                    >
-                      <ArrowDown size={14} />
-                    </MoveButton>
-                  </span>
-                )}
-                <ConfirmDelete label={a.title} onConfirm={() => mutate(() => api.deleteActivity(a.id))} />
-              </li>
-            ))}
-          </ul>
+                      {activityHandle}
+                      <input
+                        type="checkbox"
+                        checked={a.done}
+                        onChange={() => onToggle(a.id, !a.done)}
+                        aria-label={`Mark "${a.title}" ${a.done ? 'not done' : 'done'}`}
+                        className={`h-4 w-4 shrink-0 ${styles.check}`}
+                      />
+                      <EditableText
+                        value={a.title}
+                        struck={a.done}
+                        label={a.title}
+                        className="text-sm"
+                        onSave={(title) => mutate(() => api.updateActivity(a.id, { title }))}
+                      />
+                      <ConfirmDelete label={a.title} onConfirm={() => mutate(() => api.deleteActivity(a.id))} />
+                    </div>
+                  )}
+                </SortableItem>
+              ))}
+            </ul>
+          </SortableList>
           <AddForm
             placeholder="New activity"
             onAdd={(title) => mutate(() => api.createActivity(sub.id, title))}
@@ -360,19 +368,5 @@ function SubcategoryCard({
         </div>
       )}
     </div>
-  );
-}
-
-function MoveButton({ label, onClick, children }: { label: string; onClick?: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      disabled={!onClick}
-      className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:invisible"
-    >
-      {children}
-    </button>
   );
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   activityProgress,
   categoriesForTab,
-  moveId,
+  moveIdTo,
   moveSubcategory,
   reorderActivitiesInBoard,
   reorderInBoard,
@@ -65,14 +65,14 @@ describe('splitCompleted', () => {
 
 describe('moveSubcategory', () => {
   const subs = [sub(1, false), sub(2, true), sub(3, false), sub(4, false)];
-  it('swaps with the next in-progress neighbour, skipping completed ones', () =>
-    expect(moveSubcategory(subs, 1, 'down')).toEqual([3, 1, 4, 2]));
-  it('moves up', () => expect(moveSubcategory(subs, 4, 'up')).toEqual([1, 4, 3, 2]));
-  it('returns null at either end', () => {
-    expect(moveSubcategory(subs, 1, 'up')).toBeNull();
-    expect(moveSubcategory(subs, 4, 'down')).toBeNull();
+  it('drops one in-progress sub-category onto another, completed ones stay at the end', () => {
+    expect(moveSubcategory(subs, 1, 4)).toEqual([3, 4, 1, 2]);
+    expect(moveSubcategory(subs, 4, 1)).toEqual([4, 1, 3, 2]);
   });
-  it('returns null for a completed sub-category', () => expect(moveSubcategory(subs, 2, 'up')).toBeNull());
+  it('returns null when dropped on itself or involving a completed one', () => {
+    expect(moveSubcategory(subs, 3, 3)).toBeNull();
+    expect(moveSubcategory(subs, 2, 1)).toBeNull();
+  });
 });
 
 describe('reorderInBoard', () => {
@@ -87,15 +87,13 @@ describe('reorderInBoard', () => {
   });
 });
 
-describe('moveId', () => {
-  it('swaps with the neighbour', () => {
-    expect(moveId([1, 2, 3], 2, 'up')).toEqual([2, 1, 3]);
-    expect(moveId([1, 2, 3], 2, 'down')).toEqual([1, 3, 2]);
-  });
-  it('returns null at the ends or for a missing id', () => {
-    expect(moveId([1, 2], 1, 'up')).toBeNull();
-    expect(moveId([1, 2], 2, 'down')).toBeNull();
-    expect(moveId([1, 2], 9, 'up')).toBeNull();
+describe('moveIdTo', () => {
+  it('moves down, shifting the ones in between up', () => expect(moveIdTo([1, 2, 3, 4], 1, 3)).toEqual([2, 3, 1, 4]));
+  it('moves up, shifting the ones in between down', () => expect(moveIdTo([1, 2, 3, 4], 4, 2)).toEqual([1, 4, 2, 3]));
+  it('returns null for no-op or unknown ids', () => {
+    expect(moveIdTo([1, 2], 1, 1)).toBeNull();
+    expect(moveIdTo([1, 2], 9, 1)).toBeNull();
+    expect(moveIdTo([1, 2], 1, 9)).toBeNull();
   });
 });
 

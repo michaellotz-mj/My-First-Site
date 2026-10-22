@@ -50,24 +50,26 @@ export function splitCompleted(subcategories: Subcategory[]): { active: Subcateg
   return { active, completed };
 }
 
-/** Ids with one swapped one place up or down, or null if it is already at that end (or missing). */
-export function moveId(ids: number[], id: number, direction: 'up' | 'down'): number[] | null {
-  const from = ids.indexOf(id);
-  const to = direction === 'up' ? from - 1 : from + 1;
-  if (from === -1 || to < 0 || to >= ids.length) return null;
+/**
+ * Ids after dragging `activeId` to where `overId` is (the others shift to make room).
+ * Returns null when nothing moves (same id, or either id missing).
+ */
+export function moveIdTo(ids: number[], activeId: number, overId: number): number[] | null {
+  const from = ids.indexOf(activeId);
+  const to = ids.indexOf(overId);
+  if (from === -1 || to === -1 || from === to) return null;
   const next = [...ids];
-  [next[from], next[to]] = [next[to], next[from]];
+  next.splice(to, 0, ...next.splice(from, 1));
   return next;
 }
 
 /**
- * New full order of a category's sub-category ids after moving one in-progress sub-category
- * up or down among the other in-progress ones. Completed ones keep their order at the end.
- * Returns null when it can't move (already at that end, or not in progress).
+ * New full order of a category's sub-category ids after dragging one in-progress sub-category
+ * onto another. Completed ones keep their order at the end. Null when nothing moves.
  */
-export function moveSubcategory(subcategories: Subcategory[], id: number, direction: 'up' | 'down'): number[] | null {
+export function moveSubcategory(subcategories: Subcategory[], activeId: number, overId: number): number[] | null {
   const { active, completed } = splitCompleted(subcategories);
-  const moved = moveId(active.map((s) => s.id), id, direction);
+  const moved = moveIdTo(active.map((s) => s.id), activeId, overId);
   return moved && [...moved, ...completed.map((s) => s.id)];
 }
 

@@ -8,7 +8,7 @@ sub-category is struck through too (derived, not stored — an empty sub-categor
 ## Stack
 | Layer | Technology |
 |---|---|
-| Frontend | React 19 + TypeScript, Vite 8, Tailwind CSS v4, Wouter, Lucide icons |
+| Frontend | React 19 + TypeScript, Vite 8, Tailwind CSS v4, Wouter, Lucide icons, dnd-kit (drag and drop) |
 | API | Cloudflare Worker (TypeScript), `api/src/index.ts` |
 | Database | Neon Postgres via `@neondatabase/serverless` (HTTP, tagged-template queries only) |
 | Hosting | `wrangler deploy` from `frontend/` (static assets) and `api/` (Worker) |
@@ -21,9 +21,9 @@ frontend/
   src/App.tsx              router (Wouter)
   src/pages/Home.tsx       the whole board (one page)
   src/pages/NotFound.tsx
-  src/components/          AddForm, EditableText, CategoryTabs (All / Work / Business / Other), ConfirmDelete (+ .test.tsx), CompletedSection, NotesDialog (+ .test.tsx)
+  src/components/          AddForm, EditableText, CategoryTabs (All / Work / Business / Other), ConfirmDelete (+ .test.tsx), CompletedSection, NotesDialog (+ .test.tsx), Sortable (dnd-kit SortableList / SortableItem)
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
-  src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering, completed split, reorder (`moveId`, sub-categories and activities) (+ .test.ts)
+  src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering, completed split, reorder (`moveIdTo`, sub-categories and activities) (+ .test.ts)
   src/lib/storage.ts       loadChoice/saveChoice for remembered UI choices (localStorage, never throws)
   src/lib/categoryStyles.ts per-category Tailwind class names
   src/version.ts           bumped by bump-version.mjs on every deploy, shown as a badge
@@ -49,7 +49,7 @@ api/
 - Palette lives in `frontend/src/index.css` (`@theme`): cool-grey page, one muted hue per category (Work blue-grey, Business sage, Other sand). `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
 - Tabs: All, Work, Business, Other, each with a done/total sub-category count. The selected tab is remembered in localStorage (`todo-tab`, try/catch, defaults to All). Arrow/Home/End keys move between tabs. On phones the count sits under the label so all four fit.
 - Deleting asks inline ("Delete? Yes / No", No focused, Escape cancels) via `ConfirmDelete`, for both activities and sub-categories. No browser `confirm()`: it is blocked in embedded previews.
-- Reorder: ▲▼ buttons on in-progress sub-categories move them within their category (optimistic, then `PUT /api/subcategories/order` with the category's full id order). Completed ones keep their relative order at the end. Activities have the same ▲▼ buttons (shown when a sub-category has 2+ activities) and save via `PUT /api/subcategories/:id/activities/order`.
+- Reorder: drag and drop by a grip handle (⋮⋮) on the left of each in-progress sub-category and each activity (handle shown when the list has 2+ items). Mouse, touch (handle has `touch-action: none`, so the page doesn't scroll) and keyboard (Space, arrows, Space; Escape cancels) via dnd-kit, with spoken announcements using item names. Drops apply optimistically, then save the full order: `PUT /api/subcategories/order` (completed ones keep their relative order at the end) or `PUT /api/subcategories/:id/activities/order`. Dragging between categories or sub-categories is not supported.
 - Completed section: fully ticked sub-categories leave their category and appear in one "Completed" section at the bottom of the current tab (tagged with their category, collapsed by default). It can be open, minimised or hidden (`todo-completed-view` in localStorage). Unticking moves a card back.
 - Notes: a note icon on each sub-category (category-coloured and filled when it has notes) opens a modal `<dialog>` with a textarea. Save (or Ctrl/Cmd+Enter) saves; Cancel, Escape or clicking outside discards. Saved optimistically via `PATCH /api/subcategories/:id {notes}`.
 - Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
@@ -118,6 +118,7 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 - Authentication (see Security).
 
 ## Change log
+- **2026-10-22** — Reordering is now drag and drop (dnd-kit, grip handles; mouse, touch and keyboard) instead of ▲▼ buttons. Same API, no schema change.
 - **2026-10-22** — Notes on sub-categories (note icon + pop-up). **Schema change:** `subcategories.notes` via `mig-002`; CI now applies migrations to dev. PATCH sub-category is now partial (`name?`, `notes?`).
 - **2026-10-21** — Reorder activities within a sub-category (▲▼, new `PUT /api/subcategories/:id/activities/order`, no schema change).
 - **2026-10-21** — Reorder sub-categories (▲▼, new `PUT /api/subcategories/order`, no schema change); completed sub-categories move to a Completed section that can be minimised or hidden. Fixed: API now parses PUT bodies.
