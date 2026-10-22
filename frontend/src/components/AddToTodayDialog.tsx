@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { Plus } from 'lucide-react';
 import Modal from './Modal';
+import UrgencyBadge from './UrgencyBadge';
 import { CATEGORY_STYLES } from '../lib/categoryStyles';
 import { activityProgress, splitCompleted } from '../lib/progress';
 import type { CategoryBoard } from '../lib/types';
@@ -50,6 +51,7 @@ export default function AddToTodayDialog({ board, onAdd, onClose }: Props) {
                   const progress = activityProgress(s.activities);
                   return (
                     <li key={s.id} className="flex items-center gap-2 px-3 py-2">
+                      <UrgencyBadge urgency={s.urgency} name={s.name} />
                       <span className="min-w-0 flex-1 break-words text-sm">{s.name}</span>
                       <span className="shrink-0 text-xs text-slate-500 tabular-nums">
                         {progress.done}/{progress.total}

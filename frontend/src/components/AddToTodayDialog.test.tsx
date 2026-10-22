@@ -11,6 +11,7 @@ const sub = (id: number, name: string, done: boolean[], today = false): Subcateg
   notes: '',
   today,
   todayPosition: 0,
+  urgency: 2,
   activities: done.map((d, i) => ({ id: id * 10 + i, title: `a${i}`, done: d })),
 });
 

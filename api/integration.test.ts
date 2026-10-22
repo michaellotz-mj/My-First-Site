@@ -110,6 +110,28 @@ describe('To Do API', () => {
     expect(removed.data.today).toBe(false);
   });
 
+  it('defaults urgency to 2; setting 1 moves it to the top of its category and of Today', async () => {
+    const { data: a } = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} u-a`, today: true });
+    const { data: b } = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} u-b`, today: true });
+    extraIds.push(a.id, b.id);
+    expect(b.urgency).toBe(2);
+    const urgent = await api('PATCH', `/api/subcategories/${b.id}`, { urgency: 1 });
+    expect(urgent.data.urgency).toBe(1);
+    const { data: board } = await api('GET', '/api/board');
+    const other = board.find((c: any) => c.key === 'other').subcategories;
+    expect(other[0].id).toBe(b.id);
+    const todays = board.flatMap((c: any) => c.subcategories).filter((s: any) => s.today);
+    const minToday = Math.min(...todays.map((s: any) => s.todayPosition));
+    expect(todays.find((s: any) => s.id === b.id).todayPosition).toBe(minToday);
+    // Setting 1 again (already 1) or changing to 3 does not move it.
+    await api('PUT', '/api/subcategories/order', { category: 'other', ids: [a.id, b.id] });
+    await api('PATCH', `/api/subcategories/${b.id}`, { urgency: 1 });
+    const { data: again } = await api('GET', '/api/board');
+    const ids = again.find((c: any) => c.key === 'other').subcategories.map((s: any) => s.id);
+    expect(ids.indexOf(a.id)).toBeLessThan(ids.indexOf(b.id));
+    expect((await api('PATCH', `/api/subcategories/${a.id}`, { urgency: 7 })).status).toBe(400);
+  });
+
   it('rejects invalid input with 400 and unknown ids with 404', async () => {
     expect((await api('POST', '/api/subcategories', { category: 'nope', name: 'x' })).status).toBe(400);
     expect((await api('PATCH', '/api/activities/abc', { done: true })).status).toBe(400);

@@ -5,10 +5,11 @@ import ConfirmDelete from './ConfirmDelete';
 import EditableText from './EditableText';
 import NotesDialog from './NotesDialog';
 import { SortableItem, SortableList } from './Sortable';
+import UrgencyBadge from './UrgencyBadge';
 import { api } from '../lib/api';
 import { CATEGORY_STYLES } from '../lib/categoryStyles';
 import { activityProgress } from '../lib/progress';
-import type { CategoryKey, Subcategory } from '../lib/types';
+import type { CategoryKey, Subcategory, Urgency } from '../lib/types';
 
 /** Everything a card can change, supplied once by the page. */
 export interface CardActions {
@@ -17,6 +18,7 @@ export interface CardActions {
   onMoveActivity: (sub: Subcategory, activeId: number, overId: number) => void;
   onSaveNotes: (id: number, notes: string) => void;
   onSetToday: (id: number, today: boolean) => void;
+  onSetUrgency: (id: number, urgency: Urgency) => void;
 }
 
 export interface CardProps {
@@ -40,7 +42,7 @@ export default function SubcategoryCard({
   categoryLabel,
   defaultOpen = true,
 }: CardProps) {
-  const { mutate, onToggle, onMoveActivity, onSaveNotes, onSetToday } = actions;
+  const { mutate, onToggle, onMoveActivity, onSaveNotes, onSetToday, onSetUrgency } = actions;
   const [open, setOpen] = useState(defaultOpen);
   const [notesOpen, setNotesOpen] = useState(false);
   const hasNotes = sub.notes.trim() !== '';
@@ -62,6 +64,7 @@ export default function SubcategoryCard({
         >
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
+        <UrgencyBadge urgency={sub.urgency} name={sub.name} onChange={(u) => onSetUrgency(sub.id, u)} />
         <EditableText
           value={sub.name}
           struck={progress.complete}

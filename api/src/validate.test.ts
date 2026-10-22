@@ -34,14 +34,14 @@ describe('parseNewSubcategory', () => {
 describe('parseSubcategoryUpdate', () => {
   it('rejects an empty update', () => expect(parseSubcategoryUpdate({}).ok).toBe(false));
   it('accepts a new name, leaving notes unchanged', () =>
-    expect(parseSubcategoryUpdate({ name: 'Renamed' })).toEqual({ ok: true, value: { name: 'Renamed', notes: null, today: null } }));
+    expect(parseSubcategoryUpdate({ name: 'Renamed' })).toEqual({ ok: true, value: { name: 'Renamed', notes: null, today: null, urgency: null } }));
   it('accepts notes as written, including line breaks', () =>
     expect(parseSubcategoryUpdate({ notes: '  Call Sam\n- ask about v2 ' })).toEqual({
       ok: true,
-      value: { name: null, notes: '  Call Sam\n- ask about v2 ', today: null },
+      value: { name: null, notes: '  Call Sam\n- ask about v2 ', today: null, urgency: null },
     }));
   it('accepts empty notes (clears them)', () =>
-    expect(parseSubcategoryUpdate({ notes: '' })).toEqual({ ok: true, value: { name: null, notes: '', today: null } }));
+    expect(parseSubcategoryUpdate({ notes: '' })).toEqual({ ok: true, value: { name: null, notes: '', today: null, urgency: null } }));
   it('rejects a blank name and non-string or over-long notes', () => {
     expect(parseSubcategoryUpdate({ name: ' ' }).ok).toBe(false);
     expect(parseSubcategoryUpdate({ notes: 5 }).ok).toBe(false);
@@ -98,11 +98,20 @@ describe('Today', () => {
     expect(parseSubcategoryUpdate({ today: 1 }).ok).toBe(false);
   });
   it('accepts adding to and removing from Today', () => {
-    expect(parseSubcategoryUpdate({ today: true })).toEqual({ ok: true, value: { name: null, notes: null, today: true } });
-    expect(parseSubcategoryUpdate({ today: false })).toEqual({ ok: true, value: { name: null, notes: null, today: false } });
+    expect(parseSubcategoryUpdate({ today: true })).toEqual({ ok: true, value: { name: null, notes: null, today: true, urgency: null } });
+    expect(parseSubcategoryUpdate({ today: false })).toEqual({ ok: true, value: { name: null, notes: null, today: false, urgency: null } });
   });
   it('validates the Today order', () => {
     expect(parseTodayReorder({ ids: [4, 2] })).toEqual({ ok: true, value: { ids: [4, 2] } });
     expect(parseTodayReorder({ ids: [] }).ok).toBe(false);
   });
+});
+
+describe('urgency', () => {
+  it.each([1, 2, 3])('accepts %i', (urgency) =>
+    expect(parseSubcategoryUpdate({ urgency })).toEqual({
+      ok: true,
+      value: { name: null, notes: null, today: null, urgency },
+    }));
+  it.each([0, 4, 1.5, '1', null])('rejects %j', (urgency) => expect(parseSubcategoryUpdate({ urgency }).ok).toBe(false));
 });

@@ -23,9 +23,9 @@ frontend/
   src/pages/NotFound.tsx
   src/components/          AddForm, EditableText, CategoryTabs (Today / All / Work / Business / Other), ConfirmDelete (+ .test.tsx),
                            CompletedSection, Modal (shared <dialog>), NotesDialog (+ .test.tsx), Sortable (dnd-kit),
-                           SubcategoryCard (+ CardActions), TodayView, AddToTodayDialog (+ .test.tsx)
+                           SubcategoryCard (+ CardActions), TodayView, AddToTodayDialog (+ .test.tsx), UrgencyBadge (+ .test.tsx)
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
-  src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering, completed split, reorder (`moveIdTo`, sub-categories and activities), Today list (`todayItems`, `nextTodayPosition`, `reorderTodayInBoard`) (+ .test.ts)
+  src/lib/progress.ts      pure logic: completion rules, optimistic board update, tab filtering, completed split, reorder (`moveIdTo`, sub-categories and activities), Today list (`todayItems`, `nextTodayPosition`, `reorderTodayInBoard`), `setUrgencyInBoard` (+ .test.ts)
   src/lib/storage.ts       loadChoice/saveChoice for remembered UI choices (localStorage, never throws)
   src/lib/categoryStyles.ts per-category Tailwind class names
   src/version.ts           bumped by bump-version.mjs on every deploy, shown as a badge
@@ -40,6 +40,7 @@ api/
   mig-001-init.mjs         creates tables from schema.sql
   mig-002-subcategory-notes.mjs  adds subcategories.notes (idempotent)
   mig-003-today.mjs        adds subcategories.today and today_position (idempotent)
+  mig-004-urgency.mjs      adds subcategories.urgency (idempotent)
   check-dev-vars.mjs       validates DATABASE_URL shape in .dev.vars without printing it (run in CI)
   integration.test.ts      live tests against wrangler dev
   wrangler.toml            NO secrets; ALLOWED_ORIGINS lives here
@@ -56,10 +57,11 @@ api/
 - Completed section: fully ticked sub-categories leave their category and appear in one "Completed" section at the bottom of the current tab (tagged with their category, collapsed by default). It can be open, minimised or hidden (`todo-completed-view` in localStorage). Unticking moves a card back.
 - Notes: a note icon on each sub-category (category-coloured and filled when it has notes) opens a modal `<dialog>` with a textarea. Save (or Ctrl/Cmd+Enter) saves; Cancel, Escape or clicking outside discards. Saved optimistically via `PATCH /api/subcategories/:id {notes}`.
 - Today: a shared list of sub-categories picked from any category (same records, not copies, so ticks show everywhere). Add via the ☀ toggle on any card, the "Add from your lists" picker (unfinished, not already on Today, grouped by category), or "New task for today" (category select + name; `POST /api/subcategories {today: true}`). Today has its own drag order (`today_position`, `PUT /api/today/order`). Finished Today items show in Today's Completed section; "Clear finished from Today" sets `today: false` on them. Unfinished items stay on Today until removed (no daily reset). In mixed lists the category tag sits beside the progress bar.
+- Urgency: each sub-category has a 1 / 2 / 3 badge before its name (1 red "Do first", 2 amber "Important, not urgent" — the default, 3 grey "Can wait"). The badge is a transparent native `<select>` over the number, so phones show their own picker. Changing *to* 1 moves the sub-category to the top of its category and of Today (server-side in the PATCH, mirrored optimistically by `setUrgencyInBoard`); after that, drag order wins. Changing to 2 or 3, or setting 1 again, does not move it. The Add-to-Today picker shows a read-only badge.
 - Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
 
 ## Data model
-- `subcategories(id, category ∈ {work,business,other}, name, notes (≤10,000 chars, default ''), position, today (bool), today_position, created_at)`
+- `subcategories(id, category ∈ {work,business,other}, name, notes (≤10,000 chars, default ''), position, today (bool), today_position, urgency (1|2|3, default 2), created_at)`
 - `activities(id, subcategory_id → subcategories ON DELETE CASCADE, title, done, done_at, position, created_at)`
 - Categories are a CHECK constraint, not a table — they are fixed by design.
 
@@ -69,7 +71,7 @@ api/
 | GET | `/api/health` | – | runs `SELECT 1` (CI waits on this) |
 | GET | `/api/board` | – | all 3 categories, always, with nested sub-categories/activities |
 | POST | `/api/subcategories` | `{category, name, today?}` | 201; `today: true` also adds it to the bottom of Today |
-| PATCH | `/api/subcategories/:id` | `{name?, notes?, today?}` | **partial** — omitted fields kept via `COALESCE`; empty notes clears them; joining Today puts it at the bottom |
+| PATCH | `/api/subcategories/:id` | `{name?, notes?, today?, urgency?}` | **partial** — omitted fields kept via `COALESCE`; empty notes clears them; joining Today puts it at the bottom; changing urgency *to* 1 moves it to the top of its category and of Today |
 | PUT | `/api/today/order` | `{ids}` | sets `today_position` = index; ids not on Today ignored |
 | PUT | `/api/subcategories/order` | `{category, ids}` | sets `position` = index; ids from other categories ignored |
 | DELETE | `/api/subcategories/:id` | – | cascades to activities |
@@ -96,6 +98,7 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 - Pending for production (only if its tables were created from an older `schema.sql`; all are safe to re-run):
   - `mig-002`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000);`
   - `mig-003`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today BOOLEAN NOT NULL DEFAULT false;` and `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today_position INTEGER NOT NULL DEFAULT 0;`
+  - `mig-004`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS urgency SMALLINT NOT NULL DEFAULT 2 CHECK (urgency IN (1, 2, 3));`
 
 ## Deploy rules
 - **Before every `npx wrangler deploy` in `api/`: run `npx wrangler secret list` and confirm `DATABASE_URL` is listed. If `[]`, STOP.** (Exception: step 4 above, the very first deploy.)
@@ -125,6 +128,7 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 - Authentication (see Security).
 
 ## Change log
+- **2026-10-22** — Urgency 1/2/3 on sub-categories (badge picker, default 2; setting 1 jumps to the top, drag order wins after). **Schema change:** `subcategories.urgency` via `mig-004`.
 - **2026-10-22** — Today tab: pick sub-categories from any category (☀ toggle, picker, or new task), own drag order, clear finished. **Schema change:** `subcategories.today`, `today_position` via `mig-003`. Card extracted to `SubcategoryCard` with a `CardActions` bundle; shared `Modal`.
 - **2026-10-22** — Reordering is now drag and drop (dnd-kit, grip handles; mouse, touch and keyboard) instead of ▲▼ buttons. Same API, no schema change.
 - **2026-10-22** — Notes on sub-categories (note icon + pop-up). **Schema change:** `subcategories.notes` via `mig-002`; CI now applies migrations to dev. PATCH sub-category is now partial (`name?`, `notes?`).

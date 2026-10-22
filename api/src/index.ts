@@ -63,7 +63,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/api\/board$/,
     handler: async ({ sql }) => {
       const [subs, acts] = await Promise.all([
-        sql`SELECT id, category, name, notes, position, today, today_position FROM subcategories`,
+        sql`SELECT id, category, name, notes, position, today, today_position, urgency FROM subcategories`,
         sql`SELECT id, subcategory_id, title, done, position FROM activities`,
       ]);
       return json(buildBoard(subs as SubcategoryRow[], acts as ActivityRow[]));
@@ -80,7 +80,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
             (SELECT COALESCE(MAX(position), 0) + 1 FROM subcategories WHERE category = ${category}),
             ${today},
             (SELECT COALESCE(MAX(today_position), 0) + 1 FROM subcategories WHERE today))
-          RETURNING id, category, name, notes, today, today_position AS "todayPosition"`;
+          RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency`;
         return json({ ...rows[0], activities: [] }, 201);
       }),
   },
@@ -116,20 +116,30 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: ({ sql, params, body }) =>
       validated(parseId(params[0]), (id) =>
         // Partial update: null fields keep their current value.
-        validated(parseSubcategoryUpdate(body), async ({ name, notes, today }) => {
-          // Joining Today puts it at the bottom of the Today list.
+        validated(parseSubcategoryUpdate(body), async ({ name, notes, today, urgency }) => {
+          // Joining Today puts it at the bottom of the Today list. Becoming urgency 1 moves it to the
+          // top of its category and of Today; after that the user's drag order wins.
+          // (Right-hand sides see the row's old values.)
           const rows = await sql`
             UPDATE subcategories SET
               name = COALESCE(${name}::text, name),
               notes = COALESCE(${notes}::text, notes),
+              position = CASE
+                WHEN ${urgency}::smallint = 1 AND urgency <> 1
+                  THEN (SELECT MIN(s.position) - 1 FROM subcategories s WHERE s.category = subcategories.category)
+                ELSE position
+              END,
               today_position = CASE
                 WHEN ${today}::boolean AND NOT today
                   THEN (SELECT COALESCE(MAX(today_position), 0) + 1 FROM subcategories WHERE today)
+                WHEN ${urgency}::smallint = 1 AND urgency <> 1 AND today
+                  THEN (SELECT MIN(today_position) - 1 FROM subcategories WHERE today)
                 ELSE today_position
               END,
-              today = COALESCE(${today}::boolean, today)
+              today = COALESCE(${today}::boolean, today),
+              urgency = COALESCE(${urgency}::smallint, urgency)
             WHERE id = ${id}
-            RETURNING id, category, name, notes, today, today_position AS "todayPosition"`;
+            RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency`;
           return rows.length ? json(rows[0]) : notFound();
         }),
       ),

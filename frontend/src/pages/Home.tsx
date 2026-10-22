@@ -12,6 +12,7 @@ import {
   categoriesForTab,
   nextTodayPosition,
   reorderTodayInBoard,
+  setUrgencyInBoard,
   todayItems,
   moveIdTo,
   moveSubcategory,
@@ -24,7 +25,7 @@ import {
   type Tab,
 } from '../lib/progress';
 import { loadChoice, saveChoice } from '../lib/storage';
-import type { CategoryBoard, CategoryKey, Subcategory } from '../lib/types';
+import type { CategoryBoard, CategoryKey, Subcategory, Urgency } from '../lib/types';
 import { VERSION } from '../version';
 
 const TAB_KEY = 'todo-tab';
@@ -126,6 +127,15 @@ export default function Home() {
     [mutate],
   );
 
+  /** Sets urgency instantly on screen (urgency 1 jumps to the top), then saves. */
+  const setUrgency = useCallback(
+    (id: number, urgency: Urgency) => {
+      setBoard((b) => b && setUrgencyInBoard(b, id, urgency));
+      return mutate(() => api.updateSubcategory(id, { urgency }));
+    },
+    [mutate],
+  );
+
   /** Applies a dropped Today item instantly on screen, then saves the Today order. */
   const moveToday = useCallback(
     (activeId: number, overId: number) => {
@@ -145,8 +155,9 @@ export default function Home() {
       onMoveActivity: moveActivity,
       onSaveNotes: saveNotes,
       onSetToday: setToday,
+      onSetUrgency: setUrgency,
     }),
-    [mutate, toggleActivity, moveActivity, saveNotes, setToday],
+    [mutate, toggleActivity, moveActivity, saveNotes, setToday, setUrgency],
   );
 
   const today = board ? todayItems(board) : [];

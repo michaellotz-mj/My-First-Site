@@ -1,4 +1,4 @@
-import type { Activity, CategoryBoard, CategoryKey, Subcategory } from './types';
+import type { Activity, CategoryBoard, CategoryKey, Subcategory, Urgency } from './types';
 
 /**
  * API base URL. Set VITE_API_URL at build time for production
@@ -21,7 +21,7 @@ export const api = {
   board: () => request<CategoryBoard[]>('GET', '/api/board'),
   createSubcategory: (category: CategoryKey, name: string, today = false) =>
     request<Subcategory>('POST', '/api/subcategories', { category, name, today }),
-  updateSubcategory: (id: number, changes: { name?: string; notes?: string; today?: boolean }) =>
+  updateSubcategory: (id: number, changes: { name?: string; notes?: string; today?: boolean; urgency?: Urgency }) =>
     request<Subcategory>('PATCH', `/api/subcategories/${id}`, changes),
   reorderToday: (ids: number[]) => request<{ ok: true }>('PUT', '/api/today/order', { ids }),
   reorderSubcategories: (category: CategoryKey, ids: number[]) =>

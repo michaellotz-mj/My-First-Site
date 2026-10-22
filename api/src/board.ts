@@ -15,6 +15,7 @@ export interface SubcategoryRow {
   position: number;
   today: boolean;
   today_position: number;
+  urgency: number;
 }
 
 export interface ActivityRow {
@@ -37,6 +38,8 @@ export interface Subcategory {
   notes: string;
   today: boolean;
   todayPosition: number;
+  /** 1 = do first, 2 = important (default), 3 = later. */
+  urgency: number;
   activities: Activity[];
 }
 
@@ -69,6 +72,7 @@ export function buildBoard(subs: SubcategoryRow[], acts: ActivityRow[]): Categor
         notes: s.notes,
         today: s.today,
         todayPosition: s.today_position,
+        urgency: s.urgency,
         activities: activitiesBySub.get(s.id) ?? [],
       })),
   }));

@@ -1,4 +1,4 @@
-import type { Activity, CategoryBoard, CategoryKey, Subcategory } from './types';
+import type { Activity, CategoryBoard, CategoryKey, Subcategory, Urgency } from './types';
 
 export interface Progress {
   done: number;
@@ -135,4 +135,28 @@ export function updateSubcategoryInBoard(
     ...c,
     subcategories: c.subcategories.map((s) => (s.id === id ? { ...s, ...changes } : s)),
   }));
+}
+
+/**
+ * Returns a new board with one sub-category's urgency changed. Becoming urgency 1 also moves it to
+ * the top of its category and of Today (matching the API); other changes leave it where it is.
+ */
+export function setUrgencyInBoard(board: CategoryBoard[], id: number, urgency: Urgency): CategoryBoard[] {
+  const current = board.flatMap((c) => c.subcategories).find((s) => s.id === id);
+  if (!current) return board;
+  const jumps = urgency === 1 && current.urgency !== 1;
+  const topOfToday = Math.min(...todayItems(board).map((i) => i.sub.todayPosition)) - 1;
+  return board.map((c) => {
+    if (!c.subcategories.some((s) => s.id === id)) return c;
+    const updated = {
+      ...current,
+      urgency,
+      todayPosition: jumps && current.today ? topOfToday : current.todayPosition,
+    };
+    const others = c.subcategories.filter((s) => s.id !== id);
+    const subcategories = jumps
+      ? [updated, ...others]
+      : c.subcategories.map((s) => (s.id === id ? updated : s));
+    return { ...c, subcategories };
+  });
 }
