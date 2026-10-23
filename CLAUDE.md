@@ -85,6 +85,11 @@ api/
 
 Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500 `{error:"internal error"}` (message logged, never the connection string).
 
+## Live
+- Page: https://todo-frontend.michael-lotz.workers.dev (Worker `todo-frontend`, build variable `VITE_API_URL` = the API URL)
+- API: https://todo-api.michael-lotz.workers.dev (Worker `todo-api`, Secret `DATABASE_URL` = Neon `production`); health check `/api/health`
+- Both are Cloudflare Workers Builds connected to `main`: merging to `main` redeploys them.
+
 ## Setup checklist (Michael — one-off, needs your accounts)
 Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub repo; every merge to `main` rebuilds and redeploys both Workers). Nothing is run from a local machine.
 1. **Neon**: one project for this app. `production` branch = real data; `dev` branch = local + CI (tests never touch real data).
@@ -129,10 +134,10 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Sub-category completion is derived on the client (`activityProgress`); there is no `done` column on sub-categories.
 
 ## Open items
-- Complete the setup checklist and first deploy (needs Michael's Neon/Cloudflare/GitHub access).
 - Authentication (see Security).
 
 ## Change log
+- **2026-10-23** — First deploy: production tables created, both Workers live via Workers Builds; `ALLOWED_ORIGINS` set to the live page address.
 - **2026-10-23** — Deploy prep: `api/setup-database.sql` (tested on a fresh DB and on one created from the original schema, and re-run); setup checklist rewritten for Cloudflare Workers Builds.
 - **2026-10-23** — Today clears finished items automatically each morning (first open of the local day; `POST /api/today/clear-finished`, based on existing `done_at`, no schema change).
 - **2026-10-22** — Fixed: the Add-to-Today picker hid categories with nothing to add, so Business and Other could vanish. It now always shows all three, marks items already on Today, and can create new ones per category.

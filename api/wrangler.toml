@@ -7,4 +7,4 @@ compatibility_date = "2026-10-01"
 
 [vars]
 # Deployed frontend origin(s), comma-separated. localhost is always allowed.
-ALLOWED_ORIGINS = ""
+ALLOWED_ORIGINS = "https://todo-frontend.michael-lotz.workers.dev"
