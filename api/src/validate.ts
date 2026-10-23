@@ -99,6 +99,19 @@ export function parseReorder(body: unknown): Result<{ category: Category; ids: n
   return ok({ category: body.category as Category, ids: ids.value });
 }
 
+/**
+ * Cut-off for the morning clear-out: an ISO timestamp (the client's local midnight).
+ * Must be within a week of now, so a bad clock or stale tab can't clear much.
+ */
+export function parseClearBefore(body: unknown, now = Date.now()): Result<{ before: string }> {
+  if (!isObject(body)) return fail('body must be a JSON object');
+  if (typeof body.before !== 'string') return fail('before must be an ISO timestamp');
+  const time = Date.parse(body.before);
+  if (Number.isNaN(time)) return fail('before must be an ISO timestamp');
+  if (Math.abs(time - now) > 7 * 24 * 60 * 60 * 1000) return fail('before must be within a week of now');
+  return ok({ before: new Date(time).toISOString() });
+}
+
 /** Full new order of the Today list, top first. */
 export function parseTodayReorder(body: unknown): Result<{ ids: number[] }> {
   if (!isObject(body)) return fail('body must be a JSON object');

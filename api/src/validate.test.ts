@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseActivityReorder,
+  parseClearBefore,
   parseActivityUpdate,
   parseId,
   parseNewActivity,
@@ -114,4 +115,17 @@ describe('urgency', () => {
       value: { name: null, notes: null, today: null, urgency },
     }));
   it.each([0, 4, 1.5, '1', null])('rejects %j', (urgency) => expect(parseSubcategoryUpdate({ urgency }).ok).toBe(false));
+});
+
+describe('parseClearBefore', () => {
+  const now = Date.parse('2026-10-22T09:00:00Z');
+  it('accepts a recent ISO timestamp and normalises it to UTC', () =>
+    expect(parseClearBefore({ before: '2026-10-22T00:00:00+10:00' }, now)).toEqual({
+      ok: true,
+      value: { before: '2026-10-21T14:00:00.000Z' },
+    }));
+  it.each([{}, { before: 'yesterday' }, { before: 5 }, { before: '2026-09-01T00:00:00Z' }, null])(
+    'rejects %j',
+    (body) => expect(parseClearBefore(body, now).ok).toBe(false),
+  );
 });

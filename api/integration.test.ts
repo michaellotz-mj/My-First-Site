@@ -132,6 +132,36 @@ describe('To Do API', () => {
     expect((await api('PATCH', `/api/subcategories/${a.id}`, { urgency: 7 })).status).toBe(400);
   });
 
+  it('morning clear-out takes finished-before-cut-off items off Today and keeps the rest', async () => {
+    const make = async (name: string, titles: string[]) => {
+      const { data } = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} ${name}`, today: true });
+      extraIds.push(data.id);
+      const ids = [];
+      for (const title of titles) ids.push((await api('POST', `/api/subcategories/${data.id}/activities`, { title })).data.id);
+      return { id: data.id, activityIds: ids };
+    };
+    const finished = await make('finished', ['a', 'b']);
+    const unfinished = await make('unfinished', ['a', 'b']);
+    const empty = await make('empty', []);
+    for (const id of finished.activityIds) await api('PATCH', `/api/activities/${id}`, { done: true });
+    await api('PATCH', `/api/activities/${unfinished.activityIds[0]}`, { done: true });
+
+    // Cut-off before the ticks: nothing was finished before it, so nothing is cleared.
+    const early = await api('POST', '/api/today/clear-finished', { before: new Date(Date.now() - 60 * 60 * 1000).toISOString() });
+    expect(early.data.cleared).not.toContain(finished.id);
+
+    // Cut-off after the ticks: only the fully finished one comes off Today.
+    const later = await api('POST', '/api/today/clear-finished', { before: new Date(Date.now() + 5 * 60 * 1000).toISOString() });
+    expect(later.data.cleared).toContain(finished.id);
+    expect(later.data.cleared).not.toContain(unfinished.id);
+    expect(later.data.cleared).not.toContain(empty.id);
+    const { data: board } = await api('GET', '/api/board');
+    const today = board.flatMap((c: any) => c.subcategories).filter((s: any) => s.today).map((s: any) => s.id);
+    expect(today).toEqual(expect.arrayContaining([unfinished.id, empty.id]));
+    expect(today).not.toContain(finished.id);
+    expect((await api('POST', '/api/today/clear-finished', { before: 'soon' })).status).toBe(400);
+  });
+
   it('rejects invalid input with 400 and unknown ids with 404', async () => {
     expect((await api('POST', '/api/subcategories', { category: 'nope', name: 'x' })).status).toBe(400);
     expect((await api('PATCH', '/api/activities/abc', { done: true })).status).toBe(400);

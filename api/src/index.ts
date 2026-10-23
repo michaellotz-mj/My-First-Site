@@ -4,6 +4,7 @@ import { redactSecrets } from './redact';
 import {
   parseActivityReorder,
   parseActivityUpdate,
+  parseClearBefore,
   parseId,
   parseNewActivity,
   parseNewSubcategory,
@@ -82,6 +83,25 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
             (SELECT COALESCE(MAX(today_position), 0) + 1 FROM subcategories WHERE today))
           RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency`;
         return json({ ...rows[0], activities: [] }, 201);
+      }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/api\/today\/clear-finished$/,
+    handler: ({ sql, body }) =>
+      validated(parseClearBefore(body), async ({ before }) => {
+        // Takes off Today every sub-category whose activities were all ticked before the cut-off.
+        // Ones finished after it (i.e. today) and unfinished ones stay. Activities ticked before
+        // done_at existed count as old.
+        const rows = await sql`
+          UPDATE subcategories s SET today = false
+          WHERE s.today
+            AND EXISTS (SELECT 1 FROM activities a WHERE a.subcategory_id = s.id)
+            AND NOT EXISTS (SELECT 1 FROM activities a WHERE a.subcategory_id = s.id AND NOT a.done)
+            AND (SELECT COALESCE(MAX(a.done_at), '-infinity') FROM activities a WHERE a.subcategory_id = s.id)
+                < ${before}::timestamptz
+          RETURNING s.id`;
+        return json({ cleared: rows.map((r) => r.id) });
       }),
   },
   {

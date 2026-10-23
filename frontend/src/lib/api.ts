@@ -23,6 +23,9 @@ export const api = {
     request<Subcategory>('POST', '/api/subcategories', { category, name, today }),
   updateSubcategory: (id: number, changes: { name?: string; notes?: string; today?: boolean; urgency?: Urgency }) =>
     request<Subcategory>('PATCH', `/api/subcategories/${id}`, changes),
+  /** Takes off Today everything finished before `before` (the client's local midnight). */
+  clearFinishedToday: (before: Date) =>
+    request<{ cleared: number[] }>('POST', '/api/today/clear-finished', { before: before.toISOString() }),
   reorderToday: (ids: number[]) => request<{ ok: true }>('PUT', '/api/today/order', { ids }),
   reorderSubcategories: (category: CategoryKey, ids: number[]) =>
     request<{ ok: true }>('PUT', '/api/subcategories/order', { category, ids }),

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddForm from '../components/AddForm';
 import CategoryTabs from '../components/CategoryTabs';
 import CompletedSection, { COMPLETED_VIEWS, type CompletedView } from '../components/CompletedSection';
@@ -6,6 +6,7 @@ import { SortableItem, SortableList } from '../components/Sortable';
 import SubcategoryCard, { type CardActions } from '../components/SubcategoryCard';
 import TodayView from '../components/TodayView';
 import { api } from '../lib/api';
+import { localDayKey, startOfLocalDay } from '../lib/dates';
 import { CATEGORY_STYLES } from '../lib/categoryStyles';
 import {
   activityProgress,
@@ -59,8 +60,27 @@ export default function Home() {
     }
   }, []);
 
+  // Each new local day, take yesterday's finished items off Today before showing the board. Runs on
+  // open, when the app comes back into view, and every few minutes, so a tab left open overnight
+  // also clears in the morning. A failed clear-out never blocks loading.
+  const clearedDay = useRef<string | null>(null);
   useEffect(() => {
-    reload();
+    async function refreshForToday() {
+      const day = localDayKey();
+      if (clearedDay.current !== day) {
+        clearedDay.current = day;
+        await api.clearFinishedToday(startOfLocalDay()).catch(() => undefined);
+        await reload();
+      }
+    }
+    refreshForToday();
+    const onVisible = () => document.visibilityState === 'visible' && refreshForToday();
+    document.addEventListener('visibilitychange', onVisible);
+    const timer = setInterval(refreshForToday, 5 * 60 * 1000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      clearInterval(timer);
+    };
   }, [reload]);
 
   /** Runs a change against the API, then refreshes the board. */
