@@ -85,6 +85,11 @@ api/
 
 Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500 `{error:"internal error"}` (message logged, never the connection string).
 
+## Live
+- Page: https://todo-frontend.michael-lotz.workers.dev (Worker `todo-frontend`, build variable `VITE_API_URL` = the API URL)
+- API: https://todo-api.michael-lotz.workers.dev (Worker `todo-api`, Secret `DATABASE_URL` = Neon `production`); health check `/api/health`
+- Both are Cloudflare Workers Builds connected to `main`: merging to `main` redeploys them.
+
 ## Setup checklist (Michael — one-off, needs your accounts)
 Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub repo; every merge to `main` rebuilds and redeploys both Workers). Nothing is run from a local machine.
 1. **Neon**: one project for this app. `production` branch = real data; `dev` branch = local + CI (tests never touch real data).
@@ -127,12 +132,14 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Neon driver typing: use `neon<false, false>(...)` so results type as row arrays.
 - Activity tick is optimistic (`updateActivityInBoard`) — a controlled checkbox otherwise doesn't change until the API round-trip finishes, which feels laggy. The board reloads after every change, so a failed save corrects itself.
 - Sub-category completion is derived on the client (`activityProgress`); there is no `done` column on sub-categories.
+- Workers Builds also builds every non-`main` branch as a **Preview**. Recent Wrangler refuses that unless the config has a `previews` block: `api/wrangler.toml` has `[previews.vars] ALLOWED_ORIGINS = ""` (previews get no `DATABASE_URL`, so they can't reach production data) and `frontend/wrangler.jsonc` has `"previews": {}`. Add any new `[vars]` to `[previews.vars]` too, with a preview-safe value.
 
 ## Open items
-- Complete the setup checklist and first deploy (needs Michael's Neon/Cloudflare/GitHub access).
 - Authentication (see Security).
 
 ## Change log
+- **2026-10-23** — Added `previews` blocks to both Wrangler configs; Cloudflare preview builds of PR branches failed without them.
+- **2026-10-23** — First deploy: production tables created, both Workers live via Workers Builds; `ALLOWED_ORIGINS` set to the live page address.
 - **2026-10-23** — Deploy prep: `api/setup-database.sql` (tested on a fresh DB and on one created from the original schema, and re-run); setup checklist rewritten for Cloudflare Workers Builds.
 - **2026-10-23** — Today clears finished items automatically each morning (first open of the local day; `POST /api/today/clear-finished`, based on existing `done_at`, no schema change).
 - **2026-10-22** — Fixed: the Add-to-Today picker hid categories with nothing to add, so Business and Other could vanish. It now always shows all three, marks items already on Today, and can create new ones per category.

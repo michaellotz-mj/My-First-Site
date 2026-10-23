@@ -7,4 +7,9 @@ compatibility_date = "2026-10-01"
 
 [vars]
 # Deployed frontend origin(s), comma-separated. localhost is always allowed.
+ALLOWED_ORIGINS = "https://todo-frontend.michael-lotz.workers.dev"
+
+# Settings for Cloudflare preview builds (non-main branches). Deliberately empty: previews only
+# allow localhost and get no DATABASE_URL, so they can never touch the live page or production data.
+[previews.vars]
 ALLOWED_ORIGINS = ""
