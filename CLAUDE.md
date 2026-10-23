@@ -132,11 +132,13 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Neon driver typing: use `neon<false, false>(...)` so results type as row arrays.
 - Activity tick is optimistic (`updateActivityInBoard`) — a controlled checkbox otherwise doesn't change until the API round-trip finishes, which feels laggy. The board reloads after every change, so a failed save corrects itself.
 - Sub-category completion is derived on the client (`activityProgress`); there is no `done` column on sub-categories.
+- Workers Builds also builds every non-`main` branch as a **Preview**. Recent Wrangler refuses that unless the config has a `previews` block: `api/wrangler.toml` has `[previews.vars] ALLOWED_ORIGINS = ""` (previews get no `DATABASE_URL`, so they can't reach production data) and `frontend/wrangler.jsonc` has `"previews": {}`. Add any new `[vars]` to `[previews.vars]` too, with a preview-safe value.
 
 ## Open items
 - Authentication (see Security).
 
 ## Change log
+- **2026-10-23** — Added `previews` blocks to both Wrangler configs; Cloudflare preview builds of PR branches failed without them.
 - **2026-10-23** — First deploy: production tables created, both Workers live via Workers Builds; `ALLOWED_ORIGINS` set to the live page address.
 - **2026-10-23** — Deploy prep: `api/setup-database.sql` (tested on a fresh DB and on one created from the original schema, and re-run); setup checklist rewritten for Cloudflare Workers Builds.
 - **2026-10-23** — Today clears finished items automatically each morning (first open of the local day; `POST /api/today/clear-finished`, based on existing `done_at`, no schema change).
