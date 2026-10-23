@@ -16,6 +16,7 @@ sub-category is struck through too (derived, not stored — an empty sub-categor
 - Give Michael a clickable preview after each change: republish the preview Artifact at https://claude.ai/artifact/UAr7SrVrwTz5xi66xd1MkF (update it by that URL). It is the real `frontend/` built with two swaps: `src/lib/api.ts` replaced by a browser-only (localStorage) stand-in with example data, and `App.tsx` rendering `Home` directly; CSS and JS inlined into one HTML file with a "Preview" banner and a "Reset examples" button.
 - Verify in a real browser (headless Chromium, including phone width) and with the tests before reporting.
 - Changes reach the live app only through a pull request that Michael merges after CI is green.
+- **Exception — notes-only changes:** a change that touches *only* `CLAUDE.md` goes straight to `main` (no pull request; Michael prefers not to approve those). Anything else — code, config, workflows, SQL, `wrangler.*`, package files — always goes through a pull request, even if it also edits `CLAUDE.md`.
 - After each meaningful change: update this file (what changed and why, gotchas, open items), check `git status` / `git diff` for anything sensitive, then commit.
 
 **Code**
@@ -166,6 +167,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-10-23** — Rule added: `CLAUDE.md`-only changes go straight to `main`; everything else still via pull request.
 - **2026-10-23** — Added "Working rules" (communication style, preview link every change, code rules, ask-first list, secrets) from the original starter prompt and Michael's preferences.
 - **2026-10-23** — Added `previews` blocks to both Wrangler configs; Cloudflare preview builds of PR branches failed without them.
 - **2026-10-23** — First deploy: production tables created, both Workers live via Workers Builds; `ALLOWED_ORIGINS` set to the live page address.
