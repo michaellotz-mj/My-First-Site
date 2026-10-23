@@ -5,6 +5,34 @@ user-created **sub-categories** (e.g. "Screening V2 config") → **activities** 
 Ticked activities are struck through; when *every* activity in a sub-category is ticked, the
 sub-category is struck through too (derived, not stored — an empty sub-category is never "complete").
 
+## Working rules (Michael's preferences — follow these every session)
+**Communication**
+- Michael is new to coding. Explain in plain English, step by step, and say what Michael should see at each step (button names, expected results, what an error means). Assume nothing about tools Michael hasn't used yet.
+- Be concise and use bullet points. In technical explanations, separate **Fact** (confirmed), **Assumption** (inferred) and **Recommendation** (your judgement), and flag security, cost and scalability trade-offs.
+- When something is ambiguous, ask rather than guess. Offer options with a recommendation, not an exhaustive survey.
+- Report failures honestly, with the actual output. Don't say something works until it has been checked.
+
+**Every change**
+- Give Michael a clickable preview after each change: republish the preview Artifact at https://claude.ai/artifact/UAr7SrVrwTz5xi66xd1MkF (update it by that URL). It is the real `frontend/` built with two swaps: `src/lib/api.ts` replaced by a browser-only (localStorage) stand-in with example data, and `App.tsx` rendering `Home` directly; CSS and JS inlined into one HTML file with a "Preview" banner and a "Reset examples" button.
+- Verify in a real browser (headless Chromium, including phone width) and with the tests before reporting.
+- Changes reach the live app only through a pull request that Michael merges after CI is green.
+- After each meaningful change: update this file (what changed and why, gotchas, open items), check `git status` / `git diff` for anything sensitive, then commit.
+
+**Code**
+- Match the existing naming, comment density and style.
+- Extract a shared helper the third time the same logic appears; don't copy-paste it.
+- Be explicit about time zones; don't mix `toISOString()` (UTC) with local wall-clock times.
+- Never silently hide zero-value rows in counts or totals; show them.
+
+**Always ask Michael first before**
+- force-pushing or rewriting history on `main`;
+- deleting data;
+- rotating or touching secrets;
+- changing the production database, or merging anything that needs a schema change (give Michael the SQL to run on `production` first).
+
+**Secrets**
+- Never print, paste or log credential values. If one is exposed (including Michael pasting one into chat), tell Michael straight away to reset it in Neon and update the matching secret.
+
 ## Stack
 | Layer | Technology |
 |---|---|
@@ -138,6 +166,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-10-23** — Added "Working rules" (communication style, preview link every change, code rules, ask-first list, secrets) from the original starter prompt and Michael's preferences.
 - **2026-10-23** — Added `previews` blocks to both Wrangler configs; Cloudflare preview builds of PR branches failed without them.
 - **2026-10-23** — First deploy: production tables created, both Workers live via Workers Builds; `ALLOWED_ORIGINS` set to the live page address.
 - **2026-10-23** — Deploy prep: `api/setup-database.sql` (tested on a fresh DB and on one created from the original schema, and re-run); setup checklist rewritten for Cloudflare Workers Builds.
