@@ -6,7 +6,13 @@ CREATE TABLE IF NOT EXISTS subcategories (
   id          SERIAL PRIMARY KEY,
   category    TEXT NOT NULL CHECK (category IN ('work', 'business', 'other')),
   name        TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 200),
+  notes       TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000),
   position    INTEGER NOT NULL DEFAULT 0,
+  -- In the "Today" list, and its place there (separate from position within the category).
+  today           BOOLEAN NOT NULL DEFAULT false,
+  today_position  INTEGER NOT NULL DEFAULT 0,
+  -- 1 = do first, 2 = important but not urgent (default), 3 = later.
+  urgency     SMALLINT NOT NULL DEFAULT 2 CHECK (urgency IN (1, 2, 3)),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

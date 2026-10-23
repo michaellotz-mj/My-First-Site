@@ -1,4 +1,4 @@
-import type { Activity, CategoryBoard, CategoryKey, Subcategory } from './types';
+import type { Activity, CategoryBoard, CategoryKey, Subcategory, Urgency } from './types';
 
 /**
  * API base URL. Set VITE_API_URL at build time for production
@@ -19,13 +19,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   board: () => request<CategoryBoard[]>('GET', '/api/board'),
-  createSubcategory: (category: CategoryKey, name: string) =>
-    request<Subcategory>('POST', '/api/subcategories', { category, name }),
-  renameSubcategory: (id: number, name: string) =>
-    request<Subcategory>('PATCH', `/api/subcategories/${id}`, { name }),
+  createSubcategory: (category: CategoryKey, name: string, today = false) =>
+    request<Subcategory>('POST', '/api/subcategories', { category, name, today }),
+  updateSubcategory: (id: number, changes: { name?: string; notes?: string; today?: boolean; urgency?: Urgency }) =>
+    request<Subcategory>('PATCH', `/api/subcategories/${id}`, changes),
+  /** Takes off Today everything finished before `before` (the client's local midnight). */
+  clearFinishedToday: (before: Date) =>
+    request<{ cleared: number[] }>('POST', '/api/today/clear-finished', { before: before.toISOString() }),
+  reorderToday: (ids: number[]) => request<{ ok: true }>('PUT', '/api/today/order', { ids }),
+  reorderSubcategories: (category: CategoryKey, ids: number[]) =>
+    request<{ ok: true }>('PUT', '/api/subcategories/order', { category, ids }),
   deleteSubcategory: (id: number) => request<{ ok: true }>('DELETE', `/api/subcategories/${id}`),
   createActivity: (subcategoryId: number, title: string) =>
     request<Activity>('POST', `/api/subcategories/${subcategoryId}/activities`, { title }),
+  reorderActivities: (subcategoryId: number, ids: number[]) =>
+    request<{ ok: true }>('PUT', `/api/subcategories/${subcategoryId}/activities/order`, { ids }),
   updateActivity: (id: number, changes: { title?: string; done?: boolean }) =>
     request<Activity>('PATCH', `/api/activities/${id}`, changes),
   deleteActivity: (id: number) => request<{ ok: true }>('DELETE', `/api/activities/${id}`),

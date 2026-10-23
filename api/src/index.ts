@@ -2,11 +2,15 @@ import { neon } from '@neondatabase/serverless';
 import { buildBoard, type ActivityRow, type SubcategoryRow } from './board';
 import { redactSecrets } from './redact';
 import {
+  parseActivityReorder,
   parseActivityUpdate,
+  parseClearBefore,
   parseId,
   parseNewActivity,
   parseNewSubcategory,
+  parseReorder,
   parseSubcategoryUpdate,
+  parseTodayReorder,
   type Result,
 } from './validate';
 
@@ -60,7 +64,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/api\/board$/,
     handler: async ({ sql }) => {
       const [subs, acts] = await Promise.all([
-        sql`SELECT id, category, name, position FROM subcategories`,
+        sql`SELECT id, category, name, notes, position, today, today_position, urgency FROM subcategories`,
         sql`SELECT id, subcategory_id, title, done, position FROM activities`,
       ]);
       return json(buildBoard(subs as SubcategoryRow[], acts as ActivityRow[]));
@@ -70,13 +74,60 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: 'POST',
     pattern: /^\/api\/subcategories$/,
     handler: ({ sql, body }) =>
-      validated(parseNewSubcategory(body), async ({ category, name }) => {
+      validated(parseNewSubcategory(body), async ({ category, name, today }) => {
         const rows = await sql`
-          INSERT INTO subcategories (category, name, position)
+          INSERT INTO subcategories (category, name, position, today, today_position)
           VALUES (${category}, ${name},
-            (SELECT COALESCE(MAX(position), 0) + 1 FROM subcategories WHERE category = ${category}))
-          RETURNING id, category, name`;
+            (SELECT COALESCE(MAX(position), 0) + 1 FROM subcategories WHERE category = ${category}),
+            ${today},
+            (SELECT COALESCE(MAX(today_position), 0) + 1 FROM subcategories WHERE today))
+          RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency`;
         return json({ ...rows[0], activities: [] }, 201);
+      }),
+  },
+  {
+    method: 'POST',
+    pattern: /^\/api\/today\/clear-finished$/,
+    handler: ({ sql, body }) =>
+      validated(parseClearBefore(body), async ({ before }) => {
+        // Takes off Today every sub-category whose activities were all ticked before the cut-off.
+        // Ones finished after it (i.e. today) and unfinished ones stay. Activities ticked before
+        // done_at existed count as old.
+        const rows = await sql`
+          UPDATE subcategories s SET today = false
+          WHERE s.today
+            AND EXISTS (SELECT 1 FROM activities a WHERE a.subcategory_id = s.id)
+            AND NOT EXISTS (SELECT 1 FROM activities a WHERE a.subcategory_id = s.id AND NOT a.done)
+            AND (SELECT COALESCE(MAX(a.done_at), '-infinity') FROM activities a WHERE a.subcategory_id = s.id)
+                < ${before}::timestamptz
+          RETURNING s.id`;
+        return json({ cleared: rows.map((r) => r.id) });
+      }),
+  },
+  {
+    method: 'PUT',
+    pattern: /^\/api\/today\/order$/,
+    handler: ({ sql, body }) =>
+      validated(parseTodayReorder(body), async ({ ids }) => {
+        // Today position = index in the list. Ids not on Today are ignored.
+        await sql`
+          UPDATE subcategories s SET today_position = o.ord
+          FROM unnest(${ids}::int[]) WITH ORDINALITY AS o(id, ord)
+          WHERE s.id = o.id AND s.today`;
+        return json({ ok: true });
+      }),
+  },
+  {
+    method: 'PUT',
+    pattern: /^\/api\/subcategories\/order$/,
+    handler: ({ sql, body }) =>
+      validated(parseReorder(body), async ({ category, ids }) => {
+        // Position = index in the list. Ids from another category are ignored.
+        await sql`
+          UPDATE subcategories s SET position = o.ord
+          FROM unnest(${ids}::int[]) WITH ORDINALITY AS o(id, ord)
+          WHERE s.id = o.id AND s.category = ${category}`;
+        return json({ ok: true });
       }),
   },
   {
@@ -84,10 +135,31 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/api\/subcategories\/(\w+)$/,
     handler: ({ sql, params, body }) =>
       validated(parseId(params[0]), (id) =>
-        validated(parseSubcategoryUpdate(body), async ({ name }) => {
+        // Partial update: null fields keep their current value.
+        validated(parseSubcategoryUpdate(body), async ({ name, notes, today, urgency }) => {
+          // Joining Today puts it at the bottom of the Today list. Becoming urgency 1 moves it to the
+          // top of its category and of Today; after that the user's drag order wins.
+          // (Right-hand sides see the row's old values.)
           const rows = await sql`
-            UPDATE subcategories SET name = ${name} WHERE id = ${id}
-            RETURNING id, category, name`;
+            UPDATE subcategories SET
+              name = COALESCE(${name}::text, name),
+              notes = COALESCE(${notes}::text, notes),
+              position = CASE
+                WHEN ${urgency}::smallint = 1 AND urgency <> 1
+                  THEN (SELECT MIN(s.position) - 1 FROM subcategories s WHERE s.category = subcategories.category)
+                ELSE position
+              END,
+              today_position = CASE
+                WHEN ${today}::boolean AND NOT today
+                  THEN (SELECT COALESCE(MAX(today_position), 0) + 1 FROM subcategories WHERE today)
+                WHEN ${urgency}::smallint = 1 AND urgency <> 1 AND today
+                  THEN (SELECT MIN(today_position) - 1 FROM subcategories WHERE today)
+                ELSE today_position
+              END,
+              today = COALESCE(${today}::boolean, today),
+              urgency = COALESCE(${urgency}::smallint, urgency)
+            WHERE id = ${id}
+            RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency`;
           return rows.length ? json(rows[0]) : notFound();
         }),
       ),
@@ -115,6 +187,21 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
             FROM subcategories s WHERE s.id = ${subcategoryId}
             RETURNING id, title, done`;
           return rows.length ? json(rows[0], 201) : notFound();
+        }),
+      ),
+  },
+  {
+    method: 'PUT',
+    pattern: /^\/api\/subcategories\/(\w+)\/activities\/order$/,
+    handler: ({ sql, params, body }) =>
+      validated(parseId(params[0]), (subcategoryId) =>
+        validated(parseActivityReorder(body), async ({ ids }) => {
+          // Position = index in the list. Ids from another sub-category are ignored.
+          await sql`
+            UPDATE activities a SET position = o.ord
+            FROM unnest(${ids}::int[]) WITH ORDINALITY AS o(id, ord)
+            WHERE a.id = o.id AND a.subcategory_id = ${subcategoryId}`;
+          return json({ ok: true });
         }),
       ),
   },
@@ -159,7 +246,7 @@ async function route(request: Request, env: Env): Promise<Response> {
   if (!match) return json({ error: 'method not allowed' }, 405);
 
   let body: unknown = null;
-  if (request.method === 'POST' || request.method === 'PATCH') {
+  if (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') {
     try {
       body = await request.json();
     } catch {
@@ -187,7 +274,7 @@ export default {
     const corsHeaders: Record<string, string> = isAllowedOrigin(origin, env.ALLOWED_ORIGINS)
       ? {
           'Access-Control-Allow-Origin': origin!,
-          'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
           'Access-Control-Max-Age': '86400',
           Vary: 'Origin',

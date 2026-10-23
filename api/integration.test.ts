@@ -15,6 +15,7 @@ async function api(method: string, path: string, body?: unknown) {
 }
 
 let subId: number;
+const extraIds: number[] = [];
 
 beforeAll(async () => {
   const { status, data } = await api('POST', '/api/subcategories', { category: 'work', name: TAG });
@@ -24,7 +25,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // One delete: activities go with it via ON DELETE CASCADE.
-  if (subId) await api('DELETE', `/api/subcategories/${subId}`);
+  for (const id of [subId, ...extraIds]) if (id) await api('DELETE', `/api/subcategories/${id}`);
   const { data } = await api('GET', '/api/board');
   const leftovers = data.flatMap((c: any) => c.subcategories).filter((s: any) => s.name.startsWith(TAG));
   expect(leftovers).toEqual([]);
@@ -55,9 +56,110 @@ describe('To Do API', () => {
     expect(renamed.data).toMatchObject({ title: 'New', done: true });
   });
 
+  it('saves notes without changing the name, and renaming keeps the notes', async () => {
+    const notes = 'Call Sam\n- ask about v2';
+    const saved = await api('PATCH', `/api/subcategories/${subId}`, { notes });
+    expect(saved.data).toMatchObject({ name: TAG, notes });
+    const renamed = await api('PATCH', `/api/subcategories/${subId}`, { name: `${TAG} n` });
+    expect(renamed.data).toMatchObject({ name: `${TAG} n`, notes });
+    const { data: board } = await api('GET', '/api/board');
+    expect(board[0].subcategories.find((s: any) => s.id === subId).notes).toBe(notes);
+    await api('PATCH', `/api/subcategories/${subId}`, { name: TAG, notes: '' });
+  });
+
   it('renames a subcategory', async () => {
     const res = await api('PATCH', `/api/subcategories/${subId}`, { name: `${TAG} renamed` });
     expect(res.data.name).toBe(`${TAG} renamed`);
+  });
+
+  it('reorders sub-categories within a category', async () => {
+    const { data: second } = await api('POST', '/api/subcategories', { category: 'work', name: `${TAG} second` });
+    extraIds.push(second.id);
+    const res = await api('PUT', '/api/subcategories/order', { category: 'work', ids: [second.id, subId] });
+    expect(res).toEqual({ status: 200, data: { ok: true } });
+    const { data: board } = await api('GET', '/api/board');
+    const order = board[0].subcategories.map((s: any) => s.id).filter((id: number) => id === subId || id === second.id);
+    expect(order).toEqual([second.id, subId]);
+  });
+
+  it('reorders activities within a sub-category', async () => {
+    const { data: a } = await api('POST', `/api/subcategories/${subId}/activities`, { title: 'First' });
+    const { data: b } = await api('POST', `/api/subcategories/${subId}/activities`, { title: 'Second' });
+    const res = await api('PUT', `/api/subcategories/${subId}/activities/order`, { ids: [b.id, a.id] });
+    expect(res).toEqual({ status: 200, data: { ok: true } });
+    const { data: board } = await api('GET', '/api/board');
+    const sub = board[0].subcategories.find((s: any) => s.id === subId);
+    const order = sub.activities.map((x: any) => x.id).filter((id: number) => id === a.id || id === b.id);
+    expect(order).toEqual([b.id, a.id]);
+  });
+
+  it('adds to Today (at the bottom), reorders Today, and removes from Today', async () => {
+    const { data: fresh } = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} today`, today: true });
+    extraIds.push(fresh.id);
+    expect(fresh).toMatchObject({ today: true });
+    const added = await api('PATCH', `/api/subcategories/${subId}`, { today: true });
+    expect(added.data.today).toBe(true);
+    expect(added.data.todayPosition).toBeGreaterThan(fresh.todayPosition);
+    await api('PUT', '/api/today/order', { ids: [subId, fresh.id] });
+    const { data: board } = await api('GET', '/api/board');
+    const all = board.flatMap((c: any) => c.subcategories);
+    const mine = all.find((s: any) => s.id === subId);
+    const theirs = all.find((s: any) => s.id === fresh.id);
+    expect(mine.todayPosition).toBeLessThan(theirs.todayPosition);
+    const removed = await api('PATCH', `/api/subcategories/${subId}`, { today: false });
+    expect(removed.data.today).toBe(false);
+  });
+
+  it('defaults urgency to 2; setting 1 moves it to the top of its category and of Today', async () => {
+    const { data: a } = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} u-a`, today: true });
+    const { data: b } = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} u-b`, today: true });
+    extraIds.push(a.id, b.id);
+    expect(b.urgency).toBe(2);
+    const urgent = await api('PATCH', `/api/subcategories/${b.id}`, { urgency: 1 });
+    expect(urgent.data.urgency).toBe(1);
+    const { data: board } = await api('GET', '/api/board');
+    const other = board.find((c: any) => c.key === 'other').subcategories;
+    expect(other[0].id).toBe(b.id);
+    const todays = board.flatMap((c: any) => c.subcategories).filter((s: any) => s.today);
+    const minToday = Math.min(...todays.map((s: any) => s.todayPosition));
+    expect(todays.find((s: any) => s.id === b.id).todayPosition).toBe(minToday);
+    // Setting 1 again (already 1) or changing to 3 does not move it.
+    await api('PUT', '/api/subcategories/order', { category: 'other', ids: [a.id, b.id] });
+    await api('PATCH', `/api/subcategories/${b.id}`, { urgency: 1 });
+    const { data: again } = await api('GET', '/api/board');
+    const ids = again.find((c: any) => c.key === 'other').subcategories.map((s: any) => s.id);
+    expect(ids.indexOf(a.id)).toBeLessThan(ids.indexOf(b.id));
+    expect((await api('PATCH', `/api/subcategories/${a.id}`, { urgency: 7 })).status).toBe(400);
+  });
+
+  it('morning clear-out takes finished-before-cut-off items off Today and keeps the rest', async () => {
+    const make = async (name: string, titles: string[]) => {
+      const { data } = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} ${name}`, today: true });
+      extraIds.push(data.id);
+      const ids = [];
+      for (const title of titles) ids.push((await api('POST', `/api/subcategories/${data.id}/activities`, { title })).data.id);
+      return { id: data.id, activityIds: ids };
+    };
+    const finished = await make('finished', ['a', 'b']);
+    const unfinished = await make('unfinished', ['a', 'b']);
+    const empty = await make('empty', []);
+    for (const id of finished.activityIds) await api('PATCH', `/api/activities/${id}`, { done: true });
+    await api('PATCH', `/api/activities/${unfinished.activityIds[0]}`, { done: true });
+
+    // Cut-off before the ticks: nothing was finished before it, so nothing is cleared.
+    const early = await api('POST', '/api/today/clear-finished', { before: new Date(Date.now() - 60 * 60 * 1000).toISOString() });
+    expect(early.data.cleared).not.toContain(finished.id);
+
+    // Cut-off after the ticks: only the fully finished one comes off Today.
+    const later = await api('POST', '/api/today/clear-finished', { before: new Date(Date.now() + 5 * 60 * 1000).toISOString() });
+    expect(later.data.cleared).toContain(finished.id);
+    expect(later.data.cleared).not.toContain(unfinished.id);
+    expect(later.data.cleared).not.toContain(empty.id);
+    const { data: board } = await api('GET', '/api/board');
+    const today = board.flatMap((c: any) => c.subcategories).filter((s: any) => s.today).map((s: any) => s.id);
+    expect(today).toEqual(expect.arrayContaining([unfinished.id, empty.id]));
+    expect(today).not.toContain(finished.id);
+    expect((await api('POST', '/api/today/clear-finished', { before: 'soon' })).status).toBe(400);
   });
 
   it('rejects invalid input with 400 and unknown ids with 404', async () => {

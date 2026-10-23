@@ -27,22 +27,105 @@ export function parseId(raw: string): Result<number> {
   return id > 0 ? ok(id) : fail('invalid id');
 }
 
-export function parseNewSubcategory(body: unknown): Result<{ category: Category; name: string }> {
+/** `today` is optional: true also puts the new sub-category on the Today list. */
+export function parseNewSubcategory(body: unknown): Result<{ category: Category; name: string; today: boolean }> {
   if (!isObject(body)) return fail('body must be a JSON object');
   if (!CATEGORIES.includes(body.category as Category)) {
     return fail(`category must be one of: ${CATEGORIES.join(', ')}`);
   }
   const name = text(body.name, 'name', 200);
   if (!name.ok) return name;
-  return ok({ category: body.category as Category, name: name.value });
+  if (body.today !== undefined && typeof body.today !== 'boolean') return fail('today must be a boolean');
+  return ok({ category: body.category as Category, name: name.value, today: body.today === true });
 }
 
-/** Partial update: only `name` is editable. */
-export function parseSubcategoryUpdate(body: unknown): Result<{ name: string }> {
+export const MAX_NOTES = 10000;
+export const URGENCIES = [1, 2, 3] as const;
+export type Urgency = (typeof URGENCIES)[number];
+
+/**
+ * Partial update: send any of `name`, `notes`, `today`, `urgency`. Omitted fields come back as null
+ * so the SQL can COALESCE them. Notes may be empty (clears them) and keep their whitespace and line breaks.
+ */
+export function parseSubcategoryUpdate(
+  body: unknown,
+): Result<{ name: string | null; notes: string | null; today: boolean | null; urgency: Urgency | null }> {
   if (!isObject(body)) return fail('body must be a JSON object');
-  const name = text(body.name, 'name', 200);
-  if (!name.ok) return name;
-  return ok({ name: name.value });
+  let name: string | null = null;
+  let notes: string | null = null;
+  let today: boolean | null = null;
+  let urgency: Urgency | null = null;
+  if (body.name !== undefined) {
+    const n = text(body.name, 'name', 200);
+    if (!n.ok) return n;
+    name = n.value;
+  }
+  if (body.notes !== undefined) {
+    if (typeof body.notes !== 'string') return fail('notes must be a string');
+    if (body.notes.length > MAX_NOTES) return fail(`notes must be at most ${MAX_NOTES} characters`);
+    notes = body.notes;
+  }
+  if (body.today !== undefined) {
+    if (typeof body.today !== 'boolean') return fail('today must be a boolean');
+    today = body.today;
+  }
+  if (body.urgency !== undefined) {
+    if (!URGENCIES.includes(body.urgency as Urgency)) return fail('urgency must be 1, 2 or 3');
+    urgency = body.urgency as Urgency;
+  }
+  if (name === null && notes === null && today === null && urgency === null) {
+    return fail('send at least one of: name, notes, today, urgency');
+  }
+  return ok({ name, notes, today, urgency });
+}
+
+/** A non-empty list of unique positive ids, top first. */
+function idList(value: unknown): Result<number[]> {
+  if (!Array.isArray(value) || value.length === 0) return fail('ids must be a non-empty array');
+  if (value.length > 1000) return fail('ids must have at most 1000 entries');
+  if (!value.every((id) => Number.isInteger(id) && id > 0 && id < 1e9)) return fail('ids must be positive integers');
+  if (new Set(value).size !== value.length) return fail('ids must not repeat');
+  return ok(value as number[]);
+}
+
+/** Full new order of a category's sub-categories, top first. */
+export function parseReorder(body: unknown): Result<{ category: Category; ids: number[] }> {
+  if (!isObject(body)) return fail('body must be a JSON object');
+  if (!CATEGORIES.includes(body.category as Category)) {
+    return fail(`category must be one of: ${CATEGORIES.join(', ')}`);
+  }
+  const ids = idList(body.ids);
+  if (!ids.ok) return ids;
+  return ok({ category: body.category as Category, ids: ids.value });
+}
+
+/**
+ * Cut-off for the morning clear-out: an ISO timestamp (the client's local midnight).
+ * Must be within a week of now, so a bad clock or stale tab can't clear much.
+ */
+export function parseClearBefore(body: unknown, now = Date.now()): Result<{ before: string }> {
+  if (!isObject(body)) return fail('body must be a JSON object');
+  if (typeof body.before !== 'string') return fail('before must be an ISO timestamp');
+  const time = Date.parse(body.before);
+  if (Number.isNaN(time)) return fail('before must be an ISO timestamp');
+  if (Math.abs(time - now) > 7 * 24 * 60 * 60 * 1000) return fail('before must be within a week of now');
+  return ok({ before: new Date(time).toISOString() });
+}
+
+/** Full new order of the Today list, top first. */
+export function parseTodayReorder(body: unknown): Result<{ ids: number[] }> {
+  if (!isObject(body)) return fail('body must be a JSON object');
+  const ids = idList(body.ids);
+  if (!ids.ok) return ids;
+  return ok({ ids: ids.value });
+}
+
+/** Full new order of one sub-category's activities, top first. */
+export function parseActivityReorder(body: unknown): Result<{ ids: number[] }> {
+  if (!isObject(body)) return fail('body must be a JSON object');
+  const ids = idList(body.ids);
+  if (!ids.ok) return ids;
+  return ok({ ids: ids.value });
 }
 
 export function parseNewActivity(body: unknown): Result<{ title: string }> {
