@@ -37,6 +37,7 @@ api/
   src/board.ts             pure row → nested board shaping (+ .test.ts)
   src/redact.ts            strips connection strings from logged errors (+ .test.ts)
   schema.sql               reference schema (source of truth)
+  setup-database.sql       one-paste, idempotent setup/upgrade for a database in the Neon SQL Editor
   mig-env.mjs              shared loader: DATABASE_URL from .dev.vars for the mig-*.mjs scripts
   mig-001-init.mjs         creates tables from schema.sql
   mig-002-subcategory-notes.mjs  adds subcategories.notes (idempotent)
@@ -85,27 +86,29 @@ api/
 Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500 `{error:"internal error"}` (message logged, never the connection string).
 
 ## Setup checklist (Michael — one-off, needs your accounts)
-1. **Neon**: create a *new* project just for this app. Recommended: use the default `production` branch (Neon's name for main in new projects) for real data and create a `dev` branch for local + CI so tests never touch real data.
-2. **Local**: `cp api/.dev.vars.example api/.dev.vars`, paste the `dev` branch connection string, then `cd api && npm ci && node mig-001-init.mjs`.
-3. **GitHub secret** `DEV_VARS` (repo → Settings → Secrets → Actions): either the full contents of `api/.dev.vars` or just the bare `dev` branch connection string. CI's API job fails with a clear error until this exists.
-4. **First API deploy**: `cd api && npx wrangler deploy` (the Worker doesn't exist yet, so there is nothing to wipe). Note the `https://todo-api.<you>.workers.dev` URL.
-5. **Cloudflare dashboard** → Workers → `todo-api` → Settings → Variables and Secrets → add `DATABASE_URL` as type **Secret** (the `production` branch URL). Create the tables on `production` once by pasting `api/schema.sql` into the Neon SQL Editor with `production` selected.
-6. **Frontend**: create `frontend/.env.production` (gitignored) with `VITE_API_URL=https://todo-api.<you>.workers.dev`, then `cd frontend && npm ci && npm run deploy`. Note the frontend URL.
-7. Put the frontend URL in `api/wrangler.toml` → `ALLOWED_ORIGINS`, then redeploy the API (with the secret check below).
+Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub repo; every merge to `main` rebuilds and redeploys both Workers). Nothing is run from a local machine.
+1. **Neon**: one project for this app. `production` branch = real data; `dev` branch = local + CI (tests never touch real data).
+2. **GitHub secret** `DEV_VARS` = the `dev` branch connection string (bare string or full `.dev.vars`). Update it whenever the dev password changes, or CI fails with `password authentication failed`.
+3. **Production tables**: paste `api/setup-database.sql` into the Neon SQL Editor with `production` selected and Run. Safe to re-run; upgrades older tables without losing data.
+4. **API Worker** (`todo-api`): Workers & Pages → Create → Import a repository → this repo. Root directory `api`, build command `npm ci`, deploy command `npx wrangler deploy`. Name must match `wrangler.toml` (`todo-api`).
+5. **Secret**: `todo-api` → Settings → Variables and Secrets → `DATABASE_URL`, type **Secret**, value = `production` connection string. Check `https://todo-api.<subdomain>.workers.dev/api/health` → `{"ok":true}`.
+6. **Frontend Worker** (`todo-frontend`): import the repo again. Root directory `frontend`, build command `npm ci && npm run build`, deploy command `npx wrangler deploy`, build variable `VITE_API_URL` = the API URL (no trailing slash). Name must match `wrangler.jsonc` (`todo-frontend`).
+7. **CORS**: put the frontend URL in `api/wrangler.toml` → `ALLOWED_ORIGINS` (via a PR); merging it redeploys the API.
 
 ## Migrations
 - `schema.sql` is the full current schema (used by `mig-001` for a brand-new database). Each later change gets an idempotent `mig-NNN-*.mjs`.
 - CI runs every `mig-[0-9]*.mjs` in order against the `dev` branch before the integration tests, so dev stays current automatically.
-- **Production is never migrated automatically.** Ask Michael first, then run the new migration's SQL in the Neon SQL Editor with `production` selected (or run the script with `.dev.vars` temporarily pointing at production), *before* deploying the API that needs it.
+- **Production is never migrated automatically.** Ask Michael first, then run the new SQL in the Neon SQL Editor with `production` selected *before* merging the PR that needs it (merging to `main` deploys). `api/setup-database.sql` always holds the full idempotent setup — add each new migration's ALTER to it.
 - Pending for production (only if its tables were created from an older `schema.sql`; all are safe to re-run):
   - `mig-002`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000);`
   - `mig-003`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today BOOLEAN NOT NULL DEFAULT false;` and `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today_position INTEGER NOT NULL DEFAULT 0;`
   - `mig-004`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS urgency SMALLINT NOT NULL DEFAULT 2 CHECK (urgency IN (1, 2, 3));`
 
 ## Deploy rules
-- **Before every `npx wrangler deploy` in `api/`: run `npx wrangler secret list` and confirm `DATABASE_URL` is listed. If `[]`, STOP.** (Exception: step 4 above, the very first deploy.)
+- Deploys happen automatically on every merge to `main` (Workers Builds). Secrets set in the dashboard survive deploys; plain-text dashboard variables do not.
+- **If ever deploying by hand** (`npx wrangler deploy` in `api/`): run `npx wrangler secret list` first and confirm `DATABASE_URL` is listed. If `[]`, STOP.
 - `ALLOWED_ORIGINS` is defined in `wrangler.toml`, so any value edited in the dashboard is overwritten on deploy — edit the toml.
-- Frontend: `npm run deploy` = `tsc --noEmit && bump-version && build && wrangler deploy`. Commit the bumped `src/version.ts`.
+- The version badge only changes when `src/version.ts` is bumped (`node bump-version.mjs` in `frontend/`, committed); Workers Builds does not bump it.
 - Ask before deploying anything that changes the schema.
 
 ## Development
@@ -130,6 +133,7 @@ Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500
 - Authentication (see Security).
 
 ## Change log
+- **2026-10-23** — Deploy prep: `api/setup-database.sql` (tested on a fresh DB and on one created from the original schema, and re-run); setup checklist rewritten for Cloudflare Workers Builds.
 - **2026-10-23** — Today clears finished items automatically each morning (first open of the local day; `POST /api/today/clear-finished`, based on existing `done_at`, no schema change).
 - **2026-10-22** — Fixed: the Add-to-Today picker hid categories with nothing to add, so Business and Other could vanish. It now always shows all three, marks items already on Today, and can create new ones per category.
 - **2026-10-22** — Urgency 1/2/3 on sub-categories (badge picker, default 2; setting 1 jumps to the top, drag order wins after). **Schema change:** `subcategories.urgency` via `mig-004`.
