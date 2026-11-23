@@ -10,11 +10,13 @@ interface Props {
   maxLength?: number;
   /** Always show the pencil, even with a mouse (otherwise it appears on hover). */
   pencilAlways?: boolean;
+  /** Put the pencil at the right-hand end of the row (next to the buttons after it), not after the text. */
+  pencilRight?: boolean;
   onSave: (value: string) => Promise<void>;
 }
 
 /** Text with a pencil button that switches to an inline rename input. */
-export default function EditableText({ value, struck, className = '', label, maxLength, pencilAlways = false, onSave }: Props) {
+export default function EditableText({ value, struck, className = '', label, maxLength, pencilAlways = false, pencilRight = false, onSave }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
@@ -49,7 +51,7 @@ export default function EditableText({ value, struck, className = '', label, max
 
   return (
     <span className="group flex min-w-0 flex-1 items-center gap-1">
-      <span className={`min-w-0 break-words ${struck ? 'text-slate-400 line-through' : ''} ${className}`}>{value}</span>
+      <span className={`min-w-0 break-words ${pencilRight ? 'flex-1' : ''} ${struck ? 'text-slate-400 line-through' : ''} ${className}`}>{value}</span>
       <button
         type="button"
         aria-label={`Rename ${label}`}
@@ -59,7 +61,7 @@ export default function EditableText({ value, struck, className = '', label, max
         }}
         // With a mouse the pencil appears on hover (or keyboard focus). Touch screens (phones, iPads)
         // can't hover, so there it is always shown.
-        className={`shrink-0 p-1 text-slate-400 hover:text-slate-600 ${
+        className={`shrink-0 rounded p-1 hover:bg-slate-100 hover:text-slate-600 ${pencilRight ? 'text-slate-300' : 'text-slate-400'} ${
           pencilAlways ? '' : '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100'
         }`}
       >

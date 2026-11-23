@@ -169,7 +169,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 
 ## Gotchas
 - Background ring: don't use a negative z-index for it — it disappears behind any page background (it did in the preview). Keep it at `z-0` under `relative z-10` content.
-- Rename pencils (`EditableText`): with a mouse they appear on hover or keyboard focus (`[@media(hover:hover)]:opacity-0`); touch screens can't hover, so there they are always shown. Don't go back to `sm:opacity-0` — iPads are wider than `sm` and the pencil was invisible there. Category headings pass `pencilAlways`.
+- Rename pencils (`EditableText`): with a mouse they appear on hover or keyboard focus (`[@media(hover:hover)]:opacity-0`); touch screens can't hover, so there they are always shown. Don't go back to `sm:opacity-0` — iPads are wider than `sm` and the pencil was invisible there. Category headings pass `pencilAlways`. Sub-category and activity rows pass `pencilRight`: the name fills the row and the pencil sits at its right end, just before the notes icon (sub-category) or the bin (activity).
 - Neon driver typing: use `neon<false, false>(...)` so results type as row arrays.
 - Activity tick is optimistic (`updateActivityInBoard`) — a controlled checkbox otherwise doesn't change until the API round-trip finishes, which feels laggy. The board reloads after every change, so a failed save corrects itself.
 - Sub-category completion is decided by `isSubcategoryComplete` (activities if any, else the sub-category's own `done`). Use it, not `activityProgress(...).complete`, anywhere "finished" matters.
@@ -180,7 +180,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
-- **2026-11-23** — Work, Business and Other can be renamed (pencil on the heading); Today and All stay fixed and no categories can be added. **Schema change:** new `category_labels` table via `mig-006` (also in `setup-database.sql`, now 3 tables / 20 columns). New `PUT /api/categories/:key`. Long names truncate on tabs. Fixed: rename pencils were invisible on iPads (hover-only above phone width).
+- **2026-11-23** — Work, Business and Other can be renamed (pencil on the heading); Today and All stay fixed and no categories can be added. **Schema change:** new `category_labels` table via `mig-006` (also in `setup-database.sql`, now 3 tables / 20 columns). New `PUT /api/categories/:key`. Long names truncate on tabs. Fixed: rename pencils were invisible on iPads (hover-only above phone width). Rename pencils on sub-categories and activities moved to the right (next to notes / delete).
 - **2026-11-23** — Rebranded to match lotzsolutions.com.au: ring logo in a very light teal header, Manrope font, navy/teal/mist palette (slate re-tinted), teal tab underline and focus outline, teal line under the header, ring favicon, faint background ring (behind all boxes). Frontend only; no schema or API change.
 - **2026-11-23** — PR #6 live: direct completion and urgency re-ranking; `mig-005` applied to production first. Michael confirmed the live app works.
 - **2026-11-23** — Urgency re-ranking extended: every urgency change moves the sub-category just below everything more urgent (2 below the 1s, 3 below the 2s), in its category and on Today. No schema change.
