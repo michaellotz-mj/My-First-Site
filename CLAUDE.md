@@ -14,7 +14,7 @@ own tick box instead (`subcategories.done`). One rule decides "finished" everywh
 - Report failures honestly, with the actual output. Don't say something works until it has been checked.
 
 **Every change**
-- Give Michael a clickable preview after each change: republish the preview Artifact at https://claude.ai/artifact/UAr7SrVrwTz5xi66xd1MkF (update it by that URL). It is the real `frontend/` built with two swaps: `src/lib/api.ts` replaced by a browser-only (localStorage) stand-in with example data, and `App.tsx` rendering `Home` directly; CSS and JS inlined into one HTML file with a "Preview" banner and a "Reset examples" button.
+- Give Michael a clickable preview after each change: republish the preview Artifact at https://claude.ai/artifact/UAr7SrVrwTz5xi66xd1MkF (update it by that URL). It is the real `frontend/` built with two swaps: `src/lib/api.ts` replaced by a browser-only (localStorage) stand-in with example data, and `App.tsx` using wouter's hash location (`#/guide`) because the preview's address isn't `/`; CSS and JS inlined into one HTML file with a "Preview" banner and a "Reset examples" button.
 - Verify in a real browser (headless Chromium, including phone width) and with the tests before reporting.
 - Changes reach the live app only through a pull request that Michael merges after CI is green.
 - **Exception — notes-only changes:** a change that touches *only* `CLAUDE.md` goes straight to `main` (no pull request; Michael prefers not to approve those). Anything else — code, config, workflows, SQL, `wrangler.*`, package files — always goes through a pull request, even if it also edits `CLAUDE.md`.
@@ -48,10 +48,11 @@ own tick box instead (`subcategories.done`). One rule decides "finished" everywh
 ## Layout
 ```
 frontend/
-  src/App.tsx              router (Wouter)
+  src/App.tsx              router (Wouter): `/` board, `/guide` user guide
   src/pages/Home.tsx       the whole board (one page)
+  src/pages/Guide.tsx      plain-English user guide (+ .test.tsx); keep it in step with features
   src/pages/NotFound.tsx
-  src/components/          AddForm, EditableText, Logo (+ .test.tsx), RingMotif, CategoryTabs (Today / All / Work / Business / Other), ConfirmDelete (+ .test.tsx),
+  src/components/          AppHeader (shared header + Guide link), AddForm, EditableText, Logo (+ .test.tsx), RingMotif, CategoryTabs (Today / All / Work / Business / Other), ConfirmDelete (+ .test.tsx),
                            CompletedSection, Modal (shared <dialog>), NotesDialog (+ .test.tsx), Sortable (dnd-kit),
                            SubcategoryCard (+ CardActions), TodayView, AddToTodayDialog (+ .test.tsx), UrgencyBadge (+ .test.tsx)
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
@@ -85,6 +86,7 @@ api/
 
 ## Look and feel
 - Branding matches the website lotzsolutions.com.au (repo `michaellotz-mj/Website`, `src/styles/global.css` and `Logo.astro`): very light teal header (`teal-mist` `#EAF5F2`, Michael's choice; the website's header is white) with the ring logo (`components/Logo.tsx`, a React port of `Logo.astro`), a divider, then "To Do List"; a 3px brand-teal line under the header (matches the rule under "Lotz"); ring favicon (`public/favicon.svg`), `theme-color` navy; a large faint ring in the background (`components/RingMotif.tsx`, port of the website's `RingMotif.astro`), fixed to the bottom-right (vertically centred on wide screens) at `z-0`, with the header and `<main>` at `relative z-10` so every box covers it; tab title "To Do List · Lotz Solutions".
+- User guide: `/guide` (`pages/Guide.tsx`), opened by the **Guide** button in the header (`AppHeader`, shared by board and guide; the title links back to the list). Numbered sections with a contents list (buttons that scroll, not `#` links, so the hash-routed preview works), app icons and urgency badge colours (`URGENCY_COLOURS`) shown inline. The version badge is hidden on phones to make room for Guide; the guide shows the version at the bottom. Live, `/guide` works on refresh thanks to the SPA fallback in `wrangler.jsonc`.
 - Palette and font live in `frontend/src/index.css` (`@theme`), copied from the website: navy `#14284B`, teal `#1A9C8C` (`teal-text` `#13786C` for text/borders on white), mist page `#F6F8FB`, teal-mist header `#EAF5F2`, muted `#4A5B78`. Tailwind's `slate` scale is re-tinted to the brand navy, so existing `slate-*` classes follow the brand. Font: Manrope (`@fontsource-variable/manrope`, self-hosted, no Google request). Keyboard focus: 3px teal outline, like the website. Selected tab: white with a teal underline. Categories: Work navy, Business teal, Other sand. `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
 - Tabs: Today, All, Work, Business, Other, each with a done/total sub-category count. The selected tab is remembered in localStorage (`todo-tab`, try/catch, defaults to All). Arrow/Home/End keys move between tabs. On phones the count sits under the label (text-xs) and the dots/sun are hidden, so all five default names fit at 360px.
 - Deleting asks inline ("Delete? Yes / No", No focused, Escape cancels) via `ConfirmDelete`, for both activities and sub-categories. No browser `confirm()`: it is blocked in embedded previews.
@@ -168,6 +170,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - **No authentication yet (by Michael's choice).** Anyone who finds the URLs can read/edit the list. Recommended fix when wanted: Cloudflare Access (free, email one-time code) in front of both Workers — no app code needed.
 
 ## Gotchas
+- When a feature or on-screen label changes, update `pages/Guide.tsx` in the same change so the guide stays accurate.
 - Background ring: don't use a negative z-index for it — it disappears behind any page background (it did in the preview). Keep it at `z-0` under `relative z-10` content.
 - Rename pencils (`EditableText`): with a mouse they appear on hover or keyboard focus (`[@media(hover:hover)]:opacity-0`); touch screens can't hover, so there they are always shown. Don't go back to `sm:opacity-0` — iPads are wider than `sm` and the pencil was invisible there. Category headings pass `pencilAlways` and `pencilRight`; sub-category and activity rows pass `pencilRight`: the name fills the row and the pencil sits at its right end, just before the done/total pill (category), the notes icon (sub-category) or the bin (activity).
 - Neon driver typing: use `neon<false, false>(...)` so results type as row arrays.
@@ -180,6 +183,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-11-23** — User guide page (`/guide`) with a **Guide** button in the header; header extracted to `AppHeader`. Frontend only; no schema or API change.
 - **2026-11-23** — PR #7 merged: Lotz Solutions rebrand and category renaming live. `mig-006` (`category_labels`) was applied to production first (Michael ran it in the Neon SQL Editor; success). Michael confirmed the live app works, including renaming.
 - **2026-11-23** — Work, Business and Other can be renamed (pencil on the heading); Today and All stay fixed and no categories can be added. **Schema change:** new `category_labels` table via `mig-006` (also in `setup-database.sql`, now 3 tables / 20 columns). New `PUT /api/categories/:key`. Long names truncate on tabs. Fixed: rename pencils were invisible on iPads (hover-only above phone width). Rename pencils moved to the right on categories (next to the count), sub-categories (next to notes) and activities (next to delete).
 - **2026-11-23** — Rebranded to match lotzsolutions.com.au: ring logo in a very light teal header, Manrope font, navy/teal/mist palette (slate re-tinted), teal tab underline and focus outline, teal line under the header, ring favicon, faint background ring (behind all boxes). Frontend only; no schema or API change.

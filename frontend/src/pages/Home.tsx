@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddForm from '../components/AddForm';
+import AppHeader from '../components/AppHeader';
 import CategoryTabs from '../components/CategoryTabs';
 import CompletedSection, { COMPLETED_VIEWS, type CompletedView } from '../components/CompletedSection';
 import EditableText from '../components/EditableText';
-import Logo from '../components/Logo';
 import RingMotif from '../components/RingMotif';
 import { SortableItem, SortableList } from '../components/Sortable';
 import SubcategoryCard, { type CardActions } from '../components/SubcategoryCard';
@@ -32,7 +32,6 @@ import {
 } from '../lib/progress';
 import { loadChoice, saveChoice } from '../lib/storage';
 import type { CategoryBoard, CategoryKey, Subcategory, Urgency } from '../lib/types';
-import { VERSION } from '../version';
 
 const TAB_KEY = 'todo-tab';
 const TABS: readonly Tab[] = ['today', 'all', 'work', 'business', 'other'];
@@ -214,20 +213,7 @@ export default function Home() {
   return (
     <>
       <RingMotif />
-      {/* Very light teal header with the ring logo, as on lotzsolutions.com.au, and a teal line underneath
-          (the same 3px teal rule as under "Lotz" in the logo). */}
-      <header className="relative z-10 border-b-[3px] border-teal bg-teal-mist">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Logo size={38} />
-            <span aria-hidden="true" className="h-9 w-px shrink-0 bg-navy/15" />
-            <h1 className="truncate text-xl font-extrabold tracking-tight text-navy">To Do List</h1>
-          </div>
-          <span className="shrink-0 rounded bg-white px-2 py-0.5 text-xs text-muted ring-1 ring-navy/10">
-            v{VERSION}
-          </span>
-        </div>
-      </header>
+      <AppHeader page="list" />
       <main className="relative z-10 mx-auto max-w-2xl px-4 py-6 text-navy">
         {error && (
           <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
