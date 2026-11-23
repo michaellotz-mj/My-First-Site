@@ -6,6 +6,15 @@ describe('buildBoard', () => {
     expect(buildBoard([], []).map((c) => c.label)).toEqual(['Work', 'Business', 'Other']);
   });
 
+  it('uses custom category names where set, defaults elsewhere, and keeps the fixed keys', () => {
+    const board = buildBoard([], [], [{ category: 'business', label: 'Lotz Solutions' }]);
+    expect(board.map((c) => [c.key, c.label])).toEqual([
+      ['work', 'Work'],
+      ['business', 'Lotz Solutions'],
+      ['other', 'Other'],
+    ]);
+  });
+
   it('nests activities under their subcategory, ordered by position', () => {
     const board = buildBoard(
       [

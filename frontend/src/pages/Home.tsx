@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddForm from '../components/AddForm';
 import CategoryTabs from '../components/CategoryTabs';
 import CompletedSection, { COMPLETED_VIEWS, type CompletedView } from '../components/CompletedSection';
+import EditableText from '../components/EditableText';
 import Logo from '../components/Logo';
 import RingMotif from '../components/RingMotif';
 import { SortableItem, SortableList } from '../components/Sortable';
@@ -13,6 +14,7 @@ import { CATEGORY_STYLES } from '../lib/categoryStyles';
 import {
   isSubcategoryComplete,
   categoriesForTab,
+  MAX_CATEGORY_LABEL,
   nextTodayPosition,
   reorderTodayInBoard,
   setUrgencyInBoard,
@@ -21,6 +23,7 @@ import {
   moveSubcategory,
   reorderActivitiesInBoard,
   reorderInBoard,
+  renameCategoryInBoard,
   splitCompleted,
   subcategoryProgress,
   updateActivityInBoard,
@@ -167,6 +170,15 @@ export default function Home() {
     [mutate],
   );
 
+  /** Renames Work, Business or Other instantly on screen (tab, heading, tags), then saves. */
+  const renameCategory = useCallback(
+    (key: CategoryKey, label: string) => {
+      setBoard((b) => b && renameCategoryInBoard(b, key, label));
+      return mutate(() => api.renameCategory(key, label));
+    },
+    [mutate],
+  );
+
   /** Applies a dropped Today item instantly on screen, then saves the Today order. */
   const moveToday = useCallback(
     (activeId: number, overId: number) => {
@@ -245,13 +257,19 @@ export default function Home() {
             const styles = CATEGORY_STYLES[category.key];
             const { active } = splitCompleted(category.subcategories);
             return (
-              <section key={category.key} aria-labelledby={`cat-${category.key}`}>
-                <div className="mb-2 flex items-center justify-between border-b border-slate-300/70 pb-1.5">
-                  <h2 id={`cat-${category.key}`} className="flex items-center gap-2 text-lg font-bold tracking-tight">
-                    <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${styles.dot}`} />
-                    {category.label}
+              <section key={category.key} aria-label={category.label}>
+                <div className="mb-2 flex items-center justify-between gap-3 border-b border-slate-300/70 pb-1.5">
+                  {/* The name is the user's own (pencil to rename); the category itself is fixed. */}
+                  <h2 className="flex min-w-0 flex-1 items-center gap-2 text-lg font-bold tracking-tight">
+                    <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${styles.dot}`} />
+                    <EditableText
+                      value={category.label}
+                      label={`category ${category.label}`}
+                      maxLength={MAX_CATEGORY_LABEL}
+                      onSave={(label) => renameCategory(category.key, label)}
+                    />
                   </h2>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles.pill}`}>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${styles.pill}`}>
                     {progress.done}/{progress.total} complete
                   </span>
                 </div>

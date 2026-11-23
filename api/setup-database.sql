@@ -36,6 +36,15 @@ CREATE TABLE IF NOT EXISTS activities (
 
 CREATE INDEX IF NOT EXISTS activities_subcategory_idx ON activities (subcategory_id, position);
 
+-- Custom names for the three fixed categories (shown on their tabs and headings). A missing row
+-- means the default name (Work, Business, Other). The CHECK keeps it to the three categories, so
+-- renaming can never add a tab.
+-- Added by mig-006.
+CREATE TABLE IF NOT EXISTS category_labels (
+  category  TEXT PRIMARY KEY CHECK (category IN ('work', 'business', 'other')),
+  label     TEXT NOT NULL CHECK (length(label) BETWEEN 1 AND 20)
+);
+
 -- Columns added after the first version (mig-002 … mig-005). No-ops on a fresh database.
 ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000);
 ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today BOOLEAN NOT NULL DEFAULT false;
@@ -44,8 +53,8 @@ ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS urgency SMALLINT NOT NULL DEF
 ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done_at TIMESTAMPTZ;
 
--- Check: should list 2 tables and 18 columns in total (11 in subcategories, 7 in activities).
+-- Check: should list 3 tables and 20 columns in total (11 in subcategories, 7 in activities, 2 in category_labels).
 SELECT table_name, string_agg(column_name, ', ' ORDER BY ordinal_position) AS columns
 FROM information_schema.columns
-WHERE table_schema = 'public' AND table_name IN ('subcategories', 'activities')
+WHERE table_schema = 'public' AND table_name IN ('subcategories', 'activities', 'category_labels')
 GROUP BY table_name;

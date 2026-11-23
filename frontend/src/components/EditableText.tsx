@@ -6,11 +6,13 @@ interface Props {
   struck?: boolean;
   className?: string;
   label: string;
+  /** Longest name allowed while typing (the server checks it too). */
+  maxLength?: number;
   onSave: (value: string) => Promise<void>;
 }
 
 /** Text with a pencil button that switches to an inline rename input. */
-export default function EditableText({ value, struck, className = '', label, onSave }: Props) {
+export default function EditableText({ value, struck, className = '', label, maxLength, onSave }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
@@ -27,6 +29,7 @@ export default function EditableText({ value, struck, className = '', label, onS
         <input
           autoFocus
           value={draft}
+          maxLength={maxLength}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
           aria-label={`Rename ${label}`}

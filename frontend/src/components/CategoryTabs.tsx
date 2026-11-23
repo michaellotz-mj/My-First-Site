@@ -71,6 +71,7 @@ export default function CategoryTabs({ board, tab, onChange }: Props) {
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(t.key)}
             onKeyDown={(e) => onKeyDown(e, i)}
+            title={t.label}
             className={`flex min-w-0 flex-col items-center justify-center rounded-md px-0.5 py-1.5 text-xs font-medium sm:text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-brand sm:flex-row sm:gap-1.5 sm:px-3 ${
               // Selected tab: white with the website's teal underline.
               selected
@@ -78,15 +79,16 @@ export default function CategoryTabs({ board, tab, onChange }: Props) {
                 : 'text-slate-600 hover:bg-white/70'
             }`}
           >
-            <span className="flex items-center gap-1.5">
+            <span className="flex max-w-full min-w-0 items-center gap-1.5">
               {t.key === 'today' ? (
                 <Sun size={12} aria-hidden="true" className="shrink-0 text-amber-500" />
               ) : (
                 <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${t.dot}`} />
               )}
-              {t.label}
+              {/* Custom names can be long: cut off with "…" (full name on hover). */}
+              <span className="truncate">{t.label}</span>
             </span>
-            <span className="text-[11px] text-slate-500 tabular-nums sm:text-xs">
+            <span className="shrink-0 text-[11px] text-slate-500 tabular-nums sm:text-xs">
               {t.done}/{t.total}
             </span>
           </button>

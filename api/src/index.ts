@@ -1,10 +1,12 @@
 import { neon } from '@neondatabase/serverless';
-import { buildBoard, type ActivityRow, type SubcategoryRow } from './board';
+import { buildBoard, type ActivityRow, type CategoryLabelRow, type SubcategoryRow } from './board';
 import { redactSecrets } from './redact';
 import { placeByUrgency, type Ranked } from './urgency';
 import {
   parseActivityReorder,
   parseActivityUpdate,
+  parseCategoryKey,
+  parseCategoryLabel,
   parseClearBefore,
   parseId,
   parseNewActivity,
@@ -95,11 +97,28 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     method: 'GET',
     pattern: /^\/api\/board$/,
     handler: async ({ sql }) => {
-      const [subs, acts] = await Promise.all([
+      const [subs, acts, labels] = await Promise.all([
         sql`SELECT id, category, name, notes, position, today, today_position, urgency, done FROM subcategories`,
         sql`SELECT id, subcategory_id, title, done, position FROM activities`,
+        sql`SELECT category, label FROM category_labels`,
       ]);
-      return json(buildBoard(subs as SubcategoryRow[], acts as ActivityRow[]));
+      return json(buildBoard(subs as SubcategoryRow[], acts as ActivityRow[], labels as CategoryLabelRow[]));
+    },
+  },
+  {
+    method: 'PUT',
+    pattern: /^\/api\/categories\/(\w+)$/,
+    handler: ({ sql, params, body }) => {
+      // Renames one of the three fixed categories. Unknown keys are 404, so no tab can be added.
+      const category = parseCategoryKey(params[0]);
+      if (!category) return Promise.resolve(notFound());
+      return validated(parseCategoryLabel(body), async ({ label }) => {
+        const rows = await sql`
+          INSERT INTO category_labels (category, label) VALUES (${category}, ${label})
+          ON CONFLICT (category) DO UPDATE SET label = EXCLUDED.label
+          RETURNING category AS key, label`;
+        return json(rows[0]);
+      });
     },
   },
   {

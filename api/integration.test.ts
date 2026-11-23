@@ -211,6 +211,26 @@ describe('To Do API', () => {
     expect(await order()).toEqual([q, p, r]);
   });
 
+  it('renames a category, shows it on the board, and refuses new or invalid categories', async () => {
+    const board = async () => (await api('GET', '/api/board')).data as any[];
+    const before = (await board()).find((c) => c.key === 'other').label;
+    try {
+      const renamed = await api('PUT', '/api/categories/other', { label: '  Home  ' });
+      expect(renamed).toEqual({ status: 200, data: { key: 'other', label: 'Home' } });
+      const after = await board();
+      expect(after.map((c) => c.key)).toEqual(['work', 'business', 'other']);
+      expect(after.find((c) => c.key === 'other').label).toBe('Home');
+      // Today, All and anything new are not categories; names must be 1-20 characters.
+      expect((await api('PUT', '/api/categories/today', { label: 'x' })).status).toBe(404);
+      expect((await api('PUT', '/api/categories/personal', { label: 'x' })).status).toBe(404);
+      expect((await api('PUT', '/api/categories/other', { label: '' })).status).toBe(400);
+      expect((await api('PUT', '/api/categories/other', { label: 'x'.repeat(21) })).status).toBe(400);
+      expect((await board()).length).toBe(3);
+    } finally {
+      await api('PUT', '/api/categories/other', { label: before });
+    }
+  });
+
   it('rejects invalid input with 400 and unknown ids with 404', async () => {
     expect((await api('POST', '/api/subcategories', { category: 'nope', name: 'x' })).status).toBe(400);
     expect((await api('PATCH', '/api/activities/abc', { done: true })).status).toBe(400);
