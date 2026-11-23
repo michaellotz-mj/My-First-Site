@@ -183,6 +183,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-11-23** — PR #8 merged: user guide (`/guide`) and header Guide button live. No schema change.
 - **2026-11-23** — User guide page (`/guide`) with a **Guide** button in the header; header extracted to `AppHeader`. Frontend only; no schema or API change.
 - **2026-11-23** — PR #7 merged: Lotz Solutions rebrand and category renaming live. `mig-006` (`category_labels`) was applied to production first (Michael ran it in the Neon SQL Editor; success). Michael confirmed the live app works, including renaming.
 - **2026-11-23** — Work, Business and Other can be renamed (pencil on the heading); Today and All stay fixed and no categories can be added. **Schema change:** new `category_labels` table via `mig-006` (also in `setup-database.sql`, now 3 tables / 20 columns). New `PUT /api/categories/:key`. Long names truncate on tabs. Fixed: rename pencils were invisible on iPads (hover-only above phone width). Rename pencils moved to the right on categories (next to the count), sub-categories (next to notes) and activities (next to delete).
