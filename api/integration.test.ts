@@ -162,6 +162,30 @@ describe('To Do API', () => {
     expect((await api('POST', '/api/today/clear-finished', { before: 'soon' })).status).toBe(400);
   });
 
+  it('ticks off a sub-category with no activities, un-ticks it when an activity is added, and clears it from Today next morning', async () => {
+    const { data: errand } = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} errand`, today: true });
+    extraIds.push(errand.id);
+    expect(errand.done).toBe(false);
+
+    const ticked = await api('PATCH', `/api/subcategories/${errand.id}`, { done: true });
+    expect(ticked.data).toMatchObject({ done: true, name: `${TAG} errand` });
+
+    // Cut-off before the tick keeps it on Today; one after the tick clears it.
+    const early = await api('POST', '/api/today/clear-finished', { before: new Date(Date.now() - 60 * 60 * 1000).toISOString() });
+    expect(early.data.cleared).not.toContain(errand.id);
+    const later = await api('POST', '/api/today/clear-finished', { before: new Date(Date.now() + 5 * 60 * 1000).toISOString() });
+    expect(later.data.cleared).toContain(errand.id);
+
+    // Adding an activity means there is something left to do again.
+    await api('POST', `/api/subcategories/${errand.id}/activities`, { title: 'one more thing' });
+    const { data: board } = await api('GET', '/api/board');
+    const reopened = board.find((c: any) => c.key === 'other').subcategories.find((s: any) => s.id === errand.id);
+    expect(reopened.done).toBe(false);
+
+    const unticked = await api('PATCH', `/api/subcategories/${errand.id}`, { done: false });
+    expect(unticked.data.done).toBe(false);
+  });
+
   it('rejects invalid input with 400 and unknown ids with 404', async () => {
     expect((await api('POST', '/api/subcategories', { category: 'nope', name: 'x' })).status).toBe(400);
     expect((await api('PATCH', '/api/activities/abc', { done: true })).status).toBe(400);

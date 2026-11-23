@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS subcategories (
   today_position  INTEGER NOT NULL DEFAULT 0,
   -- 1 = do first, 2 = important but not urgent (default), 3 = later.
   urgency     SMALLINT NOT NULL DEFAULT 2 CHECK (urgency IN (1, 2, 3)),
+  -- Ticked off directly. Only counts while the sub-category has no activities
+  -- (with activities, it is complete when every activity is done).
+  done        BOOLEAN NOT NULL DEFAULT false,
+  done_at     TIMESTAMPTZ,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

@@ -64,7 +64,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/api\/board$/,
     handler: async ({ sql }) => {
       const [subs, acts] = await Promise.all([
-        sql`SELECT id, category, name, notes, position, today, today_position, urgency FROM subcategories`,
+        sql`SELECT id, category, name, notes, position, today, today_position, urgency, done FROM subcategories`,
         sql`SELECT id, subcategory_id, title, done, position FROM activities`,
       ]);
       return json(buildBoard(subs as SubcategoryRow[], acts as ActivityRow[]));
@@ -81,7 +81,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
             (SELECT COALESCE(MAX(position), 0) + 1 FROM subcategories WHERE category = ${category}),
             ${today},
             (SELECT COALESCE(MAX(today_position), 0) + 1 FROM subcategories WHERE today))
-          RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency`;
+          RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency, done`;
         return json({ ...rows[0], activities: [] }, 201);
       }),
   },
@@ -90,16 +90,25 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     pattern: /^\/api\/today\/clear-finished$/,
     handler: ({ sql, body }) =>
       validated(parseClearBefore(body), async ({ before }) => {
-        // Takes off Today every sub-category whose activities were all ticked before the cut-off.
-        // Ones finished after it (i.e. today) and unfinished ones stay. Activities ticked before
-        // done_at existed count as old.
+        // Takes off Today every sub-category finished before the cut-off: all its activities ticked,
+        // or, with no activities, ticked off directly. Ones finished after it (i.e. today) and
+        // unfinished ones stay. Ticks from before done_at existed count as old.
         const rows = await sql`
           UPDATE subcategories s SET today = false
           WHERE s.today
-            AND EXISTS (SELECT 1 FROM activities a WHERE a.subcategory_id = s.id)
-            AND NOT EXISTS (SELECT 1 FROM activities a WHERE a.subcategory_id = s.id AND NOT a.done)
-            AND (SELECT COALESCE(MAX(a.done_at), '-infinity') FROM activities a WHERE a.subcategory_id = s.id)
-                < ${before}::timestamptz
+            AND (
+              (
+                EXISTS (SELECT 1 FROM activities a WHERE a.subcategory_id = s.id)
+                AND NOT EXISTS (SELECT 1 FROM activities a WHERE a.subcategory_id = s.id AND NOT a.done)
+                AND (SELECT COALESCE(MAX(a.done_at), '-infinity') FROM activities a WHERE a.subcategory_id = s.id)
+                    < ${before}::timestamptz
+              )
+              OR (
+                NOT EXISTS (SELECT 1 FROM activities a WHERE a.subcategory_id = s.id)
+                AND s.done
+                AND COALESCE(s.done_at, '-infinity') < ${before}::timestamptz
+              )
+            )
           RETURNING s.id`;
         return json({ cleared: rows.map((r) => r.id) });
       }),
@@ -136,7 +145,7 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: ({ sql, params, body }) =>
       validated(parseId(params[0]), (id) =>
         // Partial update: null fields keep their current value.
-        validated(parseSubcategoryUpdate(body), async ({ name, notes, today, urgency }) => {
+        validated(parseSubcategoryUpdate(body), async ({ name, notes, today, urgency, done }) => {
           // Joining Today puts it at the bottom of the Today list. Becoming urgency 1 moves it to the
           // top of its category and of Today; after that the user's drag order wins.
           // (Right-hand sides see the row's old values.)
@@ -157,9 +166,15 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
                 ELSE today_position
               END,
               today = COALESCE(${today}::boolean, today),
-              urgency = COALESCE(${urgency}::smallint, urgency)
+              urgency = COALESCE(${urgency}::smallint, urgency),
+              done_at = CASE
+                WHEN ${done}::boolean IS NULL THEN done_at
+                WHEN ${done}::boolean THEN COALESCE(done_at, now())
+                ELSE NULL
+              END,
+              done = COALESCE(${done}::boolean, done)
             WHERE id = ${id}
-            RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency`;
+            RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency, done`;
           return rows.length ? json(rows[0]) : notFound();
         }),
       ),
@@ -180,7 +195,11 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
     handler: ({ sql, params, body }) =>
       validated(parseId(params[0]), (subcategoryId) =>
         validated(parseNewActivity(body), async ({ title }) => {
+          // Adding something to do un-ticks a sub-category that was ticked off directly.
           const rows = await sql`
+            WITH reopened AS (
+              UPDATE subcategories SET done = false, done_at = NULL WHERE id = ${subcategoryId} AND done
+            )
             INSERT INTO activities (subcategory_id, title, position)
             SELECT s.id, ${title},
               (SELECT COALESCE(MAX(position), 0) + 1 FROM activities WHERE subcategory_id = s.id)

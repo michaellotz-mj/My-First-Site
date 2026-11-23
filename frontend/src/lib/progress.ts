@@ -13,9 +13,17 @@ export function activityProgress(activities: Activity[]): Progress {
   return { done, total, complete: total > 0 && done === total };
 }
 
+/**
+ * The one rule for "is this sub-category finished?": with activities, every one is ticked;
+ * with none, it was ticked off directly.
+ */
+export function isSubcategoryComplete(sub: Subcategory): boolean {
+  return sub.activities.length > 0 ? activityProgress(sub.activities).complete : sub.done;
+}
+
 /** Counts completed sub-categories within a category. */
 export function subcategoryProgress(subcategories: Subcategory[]): Progress {
-  const done = subcategories.filter((s) => activityProgress(s.activities).complete).length;
+  const done = subcategories.filter(isSubcategoryComplete).length;
   const total = subcategories.length;
   return { done, total, complete: total > 0 && done === total };
 }
@@ -69,11 +77,11 @@ export function nextTodayPosition(board: CategoryBoard[]): number {
   return Math.max(0, ...board.flatMap((c) => c.subcategories.filter((s) => s.today).map((s) => s.todayPosition))) + 1;
 }
 
-/** Splits sub-categories into those still in progress and those with every activity ticked, keeping order. */
+/** Splits sub-categories into those still in progress and those finished (see `isSubcategoryComplete`), keeping order. */
 export function splitCompleted(subcategories: Subcategory[]): { active: Subcategory[]; completed: Subcategory[] } {
   const active: Subcategory[] = [];
   const completed: Subcategory[] = [];
-  for (const s of subcategories) (activityProgress(s.activities).complete ? completed : active).push(s);
+  for (const s of subcategories) (isSubcategoryComplete(s) ? completed : active).push(s);
   return { active, completed };
 }
 
@@ -129,7 +137,7 @@ export function reorderActivitiesInBoard(board: CategoryBoard[], subcategoryId: 
 export function updateSubcategoryInBoard(
   board: CategoryBoard[],
   id: number,
-  changes: Partial<Pick<Subcategory, 'name' | 'notes' | 'today' | 'todayPosition'>>,
+  changes: Partial<Pick<Subcategory, 'name' | 'notes' | 'today' | 'todayPosition' | 'done'>>,
 ): CategoryBoard[] {
   return board.map((c) => ({
     ...c,

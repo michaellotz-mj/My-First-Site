@@ -4,7 +4,7 @@ import AddForm from './AddForm';
 import AddToTodayDialog from './AddToTodayDialog';
 import { SortableItem, SortableList } from './Sortable';
 import SubcategoryCard, { type CardActions } from './SubcategoryCard';
-import { activityProgress, type PlacedSubcategory } from '../lib/progress';
+import { isSubcategoryComplete, type PlacedSubcategory } from '../lib/progress';
 import type { CategoryBoard, CategoryKey } from '../lib/types';
 
 interface Props {
@@ -23,8 +23,8 @@ const dateLabel = () => new Date().toLocaleDateString(undefined, { weekday: 'lon
 export default function TodayView({ board, items, actions, onReorder, onCreate, onClearFinished }: Props) {
   const [picking, setPicking] = useState(false);
   const [category, setCategory] = useState<CategoryKey>('work');
-  const active = items.filter((i) => !activityProgress(i.sub.activities).complete);
-  const finished = items.filter((i) => activityProgress(i.sub.activities).complete);
+  const active = items.filter((i) => !isSubcategoryComplete(i.sub));
+  const finished = items.filter((i) => isSubcategoryComplete(i.sub));
 
   return (
     <section aria-labelledby="today-heading" className="space-y-3">

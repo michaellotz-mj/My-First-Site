@@ -18,6 +18,8 @@ export interface Subcategory {
   today: boolean;
   todayPosition: number;
   urgency: Urgency;
+  /** Ticked off directly. Only counts while the sub-category has no activities. */
+  done: boolean;
   activities: Activity[];
 }
 

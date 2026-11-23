@@ -12,6 +12,7 @@ const sub = (id: number, name: string, done: boolean[], today = false): Subcateg
   today,
   todayPosition: 0,
   urgency: 2,
+  done: false,
   activities: done.map((d, i) => ({ id: id * 10 + i, title: `a${i}`, done: d })),
 });
 

@@ -8,7 +8,7 @@ import { SortableItem, SortableList } from './Sortable';
 import UrgencyBadge from './UrgencyBadge';
 import { api } from '../lib/api';
 import { CATEGORY_STYLES } from '../lib/categoryStyles';
-import { activityProgress } from '../lib/progress';
+import { activityProgress, isSubcategoryComplete } from '../lib/progress';
 import type { CategoryKey, Subcategory, Urgency } from '../lib/types';
 
 /** Everything a card can change, supplied once by the page. */
@@ -19,6 +19,8 @@ export interface CardActions {
   onSaveNotes: (id: number, notes: string) => void;
   onSetToday: (id: number, today: boolean) => void;
   onSetUrgency: (id: number, urgency: Urgency) => void;
+  /** Ticks off a sub-category that has no activities. */
+  onSetDone: (id: number, done: boolean) => void;
 }
 
 export interface CardProps {
@@ -42,13 +44,15 @@ export default function SubcategoryCard({
   categoryLabel,
   defaultOpen = true,
 }: CardProps) {
-  const { mutate, onToggle, onMoveActivity, onSaveNotes, onSetToday, onSetUrgency } = actions;
+  const { mutate, onToggle, onMoveActivity, onSaveNotes, onSetToday, onSetUrgency, onSetDone } = actions;
   const [open, setOpen] = useState(defaultOpen);
   const [notesOpen, setNotesOpen] = useState(false);
   const hasNotes = sub.notes.trim() !== '';
   const progress = activityProgress(sub.activities);
+  const complete = isSubcategoryComplete(sub);
+  const tickable = sub.activities.length === 0;
   const styles = CATEGORY_STYLES[category];
-  const percent = progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
+  const percent = progress.total ? Math.round((progress.done / progress.total) * 100) : complete ? 100 : 0;
 
   return (
     <div
@@ -64,10 +68,20 @@ export default function SubcategoryCard({
         >
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
+        {tickable && (
+          <input
+            type="checkbox"
+            checked={sub.done}
+            onChange={() => onSetDone(sub.id, !sub.done)}
+            aria-label={`Mark "${sub.name}" ${sub.done ? 'not done' : 'done'}`}
+            title={sub.done ? 'Done. Untick to reopen' : 'Tick off (no activities needed)'}
+            className={`ml-1 h-4 w-4 shrink-0 ${styles.check}`}
+          />
+        )}
         <UrgencyBadge urgency={sub.urgency} name={sub.name} onChange={(u) => onSetUrgency(sub.id, u)} />
         <EditableText
           value={sub.name}
-          struck={progress.complete}
+          struck={complete}
           label={sub.name}
           className="font-medium"
           onSave={(name) => mutate(() => api.updateSubcategory(sub.id, { name }))}
@@ -99,9 +113,11 @@ export default function SubcategoryCard({
             onClose={() => setNotesOpen(false)}
           />
         )}
-        <span className="shrink-0 text-xs text-slate-500 tabular-nums">
-          {progress.done}/{progress.total}
-        </span>
+        {!tickable && (
+          <span className="shrink-0 text-xs text-slate-500 tabular-nums">
+            {progress.done}/{progress.total}
+          </span>
+        )}
         <ConfirmDelete
           label={sub.name}
           question={
