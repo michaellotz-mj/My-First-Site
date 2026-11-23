@@ -41,7 +41,7 @@ export default function CompletedSection({ count, view, onViewChange, children }
           className="flex min-w-0 flex-1 items-center gap-1 text-left"
         >
           <span className="p-1 text-slate-400">{open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</span>
-          <h2 id="completed-heading" className="text-base font-semibold text-slate-600">
+          <h2 id="completed-heading" className="text-base font-bold tracking-tight text-slate-600">
             Completed
           </h2>
           <span className="ml-1 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600 tabular-nums">

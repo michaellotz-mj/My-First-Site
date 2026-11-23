@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AddForm from '../components/AddForm';
 import CategoryTabs from '../components/CategoryTabs';
 import CompletedSection, { COMPLETED_VIEWS, type CompletedView } from '../components/CompletedSection';
+import Logo from '../components/Logo';
 import { SortableItem, SortableList } from '../components/Sortable';
 import SubcategoryCard, { type CardActions } from '../components/SubcategoryCard';
 import TodayView from '../components/TodayView';
@@ -156,7 +157,7 @@ export default function Home() {
     [mutate],
   );
 
-  /** Sets urgency instantly on screen (urgency 1 jumps to the top), then saves. */
+  /** Sets urgency instantly on screen (re-ranked just below anything more urgent), then saves. */
   const setUrgency = useCallback(
     (id: number, urgency: Urgency) => {
       setBoard((b) => b && setUrgencyInBoard(b, id, urgency));
@@ -199,16 +200,20 @@ export default function Home() {
 
   return (
     <>
-      <header className="bg-brand text-white">
-        <div className="mx-auto flex max-w-2xl items-end justify-between px-4 py-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-brand-soft">Lotz Solutions</p>
-            <h1 className="text-2xl font-bold">To Do List</h1>
+      {/* White header with the ring logo, as on lotzsolutions.com.au. */}
+      <header className="border-b border-navy/10 bg-white">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <Logo size={38} />
+            <span aria-hidden="true" className="h-9 w-px shrink-0 bg-navy/15" />
+            <h1 className="truncate text-xl font-extrabold tracking-tight text-navy">To Do List</h1>
           </div>
-          <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-brand-soft">v{VERSION}</span>
+          <span className="shrink-0 rounded bg-mist px-2 py-0.5 text-xs text-muted ring-1 ring-navy/10">
+            v{VERSION}
+          </span>
         </div>
       </header>
-      <main className="mx-auto max-w-2xl px-4 py-6 text-slate-800">
+      <main className="mx-auto max-w-2xl px-4 py-6 text-navy">
         {error && (
           <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
@@ -239,7 +244,7 @@ export default function Home() {
             return (
               <section key={category.key} aria-labelledby={`cat-${category.key}`}>
                 <div className="mb-2 flex items-center justify-between border-b border-slate-300/70 pb-1.5">
-                  <h2 id={`cat-${category.key}`} className="flex items-center gap-2 text-lg font-semibold">
+                  <h2 id={`cat-${category.key}`} className="flex items-center gap-2 text-lg font-bold tracking-tight">
                     <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${styles.dot}`} />
                     {category.label}
                   </h2>

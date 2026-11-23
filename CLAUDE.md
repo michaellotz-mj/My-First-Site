@@ -51,7 +51,7 @@ frontend/
   src/App.tsx              router (Wouter)
   src/pages/Home.tsx       the whole board (one page)
   src/pages/NotFound.tsx
-  src/components/          AddForm, EditableText, CategoryTabs (Today / All / Work / Business / Other), ConfirmDelete (+ .test.tsx),
+  src/components/          AddForm, EditableText, Logo (+ .test.tsx), CategoryTabs (Today / All / Work / Business / Other), ConfirmDelete (+ .test.tsx),
                            CompletedSection, Modal (shared <dialog>), NotesDialog (+ .test.tsx), Sortable (dnd-kit),
                            SubcategoryCard (+ CardActions), TodayView, AddToTodayDialog (+ .test.tsx), UrgencyBadge (+ .test.tsx)
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
@@ -83,8 +83,8 @@ api/
 ```
 
 ## Look and feel
-- Branding: "Lotz Solutions" eyebrow above the "To Do List" title in a slate-teal header band; tab title "To Do List · Lotz Solutions".
-- Palette lives in `frontend/src/index.css` (`@theme`): cool-grey page, one muted hue per category (Work blue-grey, Business sage, Other sand). `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
+- Branding matches the website lotzsolutions.com.au (repo `michaellotz-mj/Website`, `src/styles/global.css` and `Logo.astro`): white header with the ring logo (`components/Logo.tsx`, a React port of `Logo.astro`), a divider, then "To Do List"; ring favicon (`public/favicon.svg`), `theme-color` navy; tab title "To Do List · Lotz Solutions".
+- Palette and font live in `frontend/src/index.css` (`@theme`), copied from the website: navy `#14284B`, teal `#1A9C8C` (`teal-text` `#13786C` for text/borders on white), mist page `#F6F8FB`, muted `#4A5B78`. Tailwind's `slate` scale is re-tinted to the brand navy, so existing `slate-*` classes follow the brand. Font: Manrope (`@fontsource-variable/manrope`, self-hosted, no Google request). Keyboard focus: 3px teal outline, like the website. Selected tab: white with a teal underline. Categories: Work navy, Business teal, Other sand. `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
 - Tabs: Today, All, Work, Business, Other, each with a done/total sub-category count. The selected tab is remembered in localStorage (`todo-tab`, try/catch, defaults to All). Arrow/Home/End keys move between tabs. On phones the count sits under the label (text-xs) so all five fit at 360px.
 - Deleting asks inline ("Delete? Yes / No", No focused, Escape cancels) via `ConfirmDelete`, for both activities and sub-categories. No browser `confirm()`: it is blocked in embedded previews.
 - Reorder: drag and drop by a grip handle (⋮⋮) on the left of each in-progress sub-category and each activity (handle shown when the list has 2+ items). Mouse, touch (handle has `touch-action: none`, so the page doesn't scroll) and keyboard (Space, arrows, Space; Escape cancels) via dnd-kit, with spoken announcements using item names. Drops apply optimistically, then save the full order: `PUT /api/subcategories/order` (completed ones keep their relative order at the end) or `PUT /api/subcategories/:id/activities/order`. Dragging between categories or sub-categories is not supported.
@@ -93,7 +93,7 @@ api/
 - Today: a shared list of sub-categories picked from any category (same records, not copies, so ticks show everywhere). Add via the ☀ toggle on any card, the "Add from your lists" picker (always lists Work, Business and Other: unfinished sub-categories with Add, ones already on Today marked "On Today", an empty-state line, and a "New … sub-category" box per category that creates straight onto Today), or "New task for today" (category select + name; `POST /api/subcategories {today: true}`). Today has its own drag order (`today_position`, `PUT /api/today/order`). Finished Today items show in Today's Completed section; "Clear finished from Today" sets `today: false` on them. Morning clear-out: on the first load of each local day (also when the app becomes visible again, and every 5 minutes, so an overnight tab clears too) the app calls `POST /api/today/clear-finished {before: local midnight}`, which takes off Today every sub-category whose activities were all ticked before that moment (latest `activities.done_at`). Unfinished items, empty ones, and ones finished today stay. Uses the device's own time zone; a failed clear-out never blocks loading. In mixed lists the category tag sits beside the progress bar.
 - Urgency: each sub-category has a 1 / 2 / 3 badge before its name (1 red "Do first", 2 amber "Important, not urgent" — the default, 3 grey "Can wait"). The badge is a transparent native `<select>` over the number, so phones show their own picker. Every urgency *change* re-ranks the sub-category just below the last unfinished, more-urgent item (1 → top, 2 → below the 1s, 3 → below the 2s), in its category and on Today. Rule: `placeByUrgency` in `api/src/urgency.ts` (server, in the PATCH) mirrored in `frontend/src/lib/progress.ts` (optimistic). After that, drag order wins; setting the same urgency again moves nothing. The Add-to-Today picker shows a read-only badge.
 - Direct completion: a sub-category with no activities shows a tick box (before the urgency badge) instead of the `0/0` count. Ticking it marks it finished everywhere (strike-through, Completed section, tab counts, Today, morning clear-out). Adding an activity re-opens it (the API resets `done` in the same statement), and from then on its activities decide.
-- Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
+- Colour is used for dots, count pills, tick boxes and the per-sub-category progress bar; urgency badge colours (red / amber / grey) are unchanged by the rebrand.
 
 ## Data model
 - `subcategories(id, category ∈ {work,business,other}, name, notes (≤10,000 chars, default ''), position, today (bool), today_position, urgency (1|2|3, default 2), done (bool), done_at, created_at)` — `done` only counts while the sub-category has no activities
@@ -173,6 +173,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-11-23** — Rebranded to match lotzsolutions.com.au: ring logo in a white header, Manrope font, navy/teal/mist palette (slate re-tinted), teal tab underline and focus outline, ring favicon. Frontend only; no schema or API change.
 - **2026-11-23** — PR #6 live: direct completion and urgency re-ranking; `mig-005` applied to production first. Michael confirmed the live app works.
 - **2026-11-23** — Urgency re-ranking extended: every urgency change moves the sub-category just below everything more urgent (2 below the 1s, 3 below the 2s), in its category and on Today. No schema change.
 - **2026-11-23** — Sub-categories with no activities can be ticked off directly (tick box replaces the `0/0` count). **Schema change:** `subcategories.done`, `done_at` via `mig-005` (also in `setup-database.sql`). Fixed `mig-001` breaking on a `;` at the end of a comment line, and the expected column count in `setup-database.sql`. Long names no longer push the rename pencil over the note icon on phones.

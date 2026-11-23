@@ -30,7 +30,7 @@ export default function NotesDialog({ title, notes, onSave, onClose }: Props) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</p>
-            <h2 id="notes-title" className="break-words text-lg font-semibold">
+            <h2 id="notes-title" className="break-words text-lg font-bold tracking-tight">
               {title}
             </h2>
           </div>

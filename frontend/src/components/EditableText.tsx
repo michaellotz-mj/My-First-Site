@@ -30,9 +30,9 @@ export default function EditableText({ value, struck, className = '', label, onS
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
           aria-label={`Rename ${label}`}
-          className="min-w-0 flex-1 rounded border border-blue-400 px-1 text-sm focus:outline-none"
+          className="min-w-0 flex-1 rounded border border-teal-text px-1 text-sm focus:outline-none"
         />
-        <button type="submit" aria-label="Save" className="p-1 text-green-600">
+        <button type="submit" aria-label="Save" className="p-1 text-teal-text">
           <Check size={16} />
         </button>
         <button type="button" aria-label="Cancel" onClick={() => setEditing(false)} className="p-1 text-slate-400">
