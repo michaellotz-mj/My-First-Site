@@ -141,7 +141,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
   - `mig-002`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000);`
   - `mig-003`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today BOOLEAN NOT NULL DEFAULT false;` and `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today_position INTEGER NOT NULL DEFAULT 0;`
   - `mig-004`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS urgency SMALLINT NOT NULL DEFAULT 2 CHECK (urgency IN (1, 2, 3));`
-  - **`mig-005` (not yet run on production, needed before merging the direct-completion PR):** `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done BOOLEAN NOT NULL DEFAULT false;` and `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done_at TIMESTAMPTZ;`
+  - `mig-005` (**applied to production 2026-11-23**): `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done BOOLEAN NOT NULL DEFAULT false;` and `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done_at TIMESTAMPTZ;`
 
 ## Deploy rules
 - Deploys happen automatically on every merge to `main` (Workers Builds). Secrets set in the dashboard survive deploys; plain-text dashboard variables do not.
@@ -173,6 +173,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-11-23** — PR #6 live: direct completion and urgency re-ranking; `mig-005` applied to production first. Michael confirmed the live app works.
 - **2026-11-23** — Urgency re-ranking extended: every urgency change moves the sub-category just below everything more urgent (2 below the 1s, 3 below the 2s), in its category and on Today. No schema change.
 - **2026-11-23** — Sub-categories with no activities can be ticked off directly (tick box replaces the `0/0` count). **Schema change:** `subcategories.done`, `done_at` via `mig-005` (also in `setup-database.sql`). Fixed `mig-001` breaking on a `;` at the end of a comment line, and the expected column count in `setup-database.sql`. Long names no longer push the rename pencil over the note icon on phones.
 - **2026-10-23** — Rule added: `CLAUDE.md`-only changes go straight to `main`; everything else still via pull request.
