@@ -44,7 +44,7 @@ export default function EditableText({ value, struck, className = '', label, onS
 
   return (
     <span className="group flex min-w-0 flex-1 items-center gap-1">
-      <span className={`break-words ${struck ? 'text-slate-400 line-through' : ''} ${className}`}>{value}</span>
+      <span className={`min-w-0 break-words ${struck ? 'text-slate-400 line-through' : ''} ${className}`}>{value}</span>
       <button
         type="button"
         aria-label={`Rename ${label}`}
@@ -52,7 +52,7 @@ export default function EditableText({ value, struck, className = '', label, onS
           setDraft(value);
           setEditing(true);
         }}
-        className="p-1 text-slate-300 hover:text-slate-600 sm:opacity-0 sm:group-hover:opacity-100"
+        className="shrink-0 p-1 text-slate-300 hover:text-slate-600 sm:opacity-0 sm:group-hover:opacity-100"
       >
         <Pencil size={14} />
       </button>

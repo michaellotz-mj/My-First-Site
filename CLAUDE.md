@@ -3,7 +3,8 @@
 Personal to-do app for one user (Michael). Three **fixed categories** (Work, Business, Other) →
 user-created **sub-categories** (e.g. "Screening V2 config") → **activities** that get ticked off.
 Ticked activities are struck through; when *every* activity in a sub-category is ticked, the
-sub-category is struck through too (derived, not stored — an empty sub-category is never "complete").
+sub-category is struck through too (derived, not stored). A sub-category with **no** activities has its
+own tick box instead (`subcategories.done`). One rule decides "finished" everywhere: `isSubcategoryComplete`.
 
 ## Working rules (Michael's preferences — follow these every session)
 **Communication**
@@ -65,6 +66,7 @@ api/
   src/validate.ts          pure input validation (+ .test.ts)
   src/board.ts             pure row → nested board shaping (+ .test.ts)
   src/redact.ts            strips connection strings from logged errors (+ .test.ts)
+  src/urgency.ts           placeByUrgency: where a sub-category goes when its urgency changes (+ .test.ts)
   schema.sql               reference schema (source of truth)
   setup-database.sql       one-paste, idempotent setup/upgrade for a database in the Neon SQL Editor
   mig-env.mjs              shared loader: DATABASE_URL from .dev.vars for the mig-*.mjs scripts
@@ -72,6 +74,7 @@ api/
   mig-002-subcategory-notes.mjs  adds subcategories.notes (idempotent)
   mig-003-today.mjs        adds subcategories.today and today_position (idempotent)
   mig-004-urgency.mjs      adds subcategories.urgency (idempotent)
+  mig-005-subcategory-done.mjs  adds subcategories.done and done_at (idempotent)
   check-dev-vars.mjs       validates DATABASE_URL shape in .dev.vars without printing it (run in CI)
   integration.test.ts      live tests against wrangler dev
   wrangler.toml            NO secrets; ALLOWED_ORIGINS lives here
@@ -88,11 +91,12 @@ api/
 - Completed section: fully ticked sub-categories leave their category and appear in one "Completed" section at the bottom of the current tab (tagged with their category, collapsed by default). It can be open, minimised or hidden (`todo-completed-view` in localStorage). Unticking moves a card back.
 - Notes: a note icon on each sub-category (category-coloured and filled when it has notes) opens a modal `<dialog>` with a textarea. Save (or Ctrl/Cmd+Enter) saves; Cancel, Escape or clicking outside discards. Saved optimistically via `PATCH /api/subcategories/:id {notes}`.
 - Today: a shared list of sub-categories picked from any category (same records, not copies, so ticks show everywhere). Add via the ☀ toggle on any card, the "Add from your lists" picker (always lists Work, Business and Other: unfinished sub-categories with Add, ones already on Today marked "On Today", an empty-state line, and a "New … sub-category" box per category that creates straight onto Today), or "New task for today" (category select + name; `POST /api/subcategories {today: true}`). Today has its own drag order (`today_position`, `PUT /api/today/order`). Finished Today items show in Today's Completed section; "Clear finished from Today" sets `today: false` on them. Morning clear-out: on the first load of each local day (also when the app becomes visible again, and every 5 minutes, so an overnight tab clears too) the app calls `POST /api/today/clear-finished {before: local midnight}`, which takes off Today every sub-category whose activities were all ticked before that moment (latest `activities.done_at`). Unfinished items, empty ones, and ones finished today stay. Uses the device's own time zone; a failed clear-out never blocks loading. In mixed lists the category tag sits beside the progress bar.
-- Urgency: each sub-category has a 1 / 2 / 3 badge before its name (1 red "Do first", 2 amber "Important, not urgent" — the default, 3 grey "Can wait"). The badge is a transparent native `<select>` over the number, so phones show their own picker. Changing *to* 1 moves the sub-category to the top of its category and of Today (server-side in the PATCH, mirrored optimistically by `setUrgencyInBoard`); after that, drag order wins. Changing to 2 or 3, or setting 1 again, does not move it. The Add-to-Today picker shows a read-only badge.
+- Urgency: each sub-category has a 1 / 2 / 3 badge before its name (1 red "Do first", 2 amber "Important, not urgent" — the default, 3 grey "Can wait"). The badge is a transparent native `<select>` over the number, so phones show their own picker. Every urgency *change* re-ranks the sub-category just below the last unfinished, more-urgent item (1 → top, 2 → below the 1s, 3 → below the 2s), in its category and on Today. Rule: `placeByUrgency` in `api/src/urgency.ts` (server, in the PATCH) mirrored in `frontend/src/lib/progress.ts` (optimistic). After that, drag order wins; setting the same urgency again moves nothing. The Add-to-Today picker shows a read-only badge.
+- Direct completion: a sub-category with no activities shows a tick box (before the urgency badge) instead of the `0/0` count. Ticking it marks it finished everywhere (strike-through, Completed section, tab counts, Today, morning clear-out). Adding an activity re-opens it (the API resets `done` in the same statement), and from then on its activities decide.
 - Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
 
 ## Data model
-- `subcategories(id, category ∈ {work,business,other}, name, notes (≤10,000 chars, default ''), position, today (bool), today_position, urgency (1|2|3, default 2), created_at)`
+- `subcategories(id, category ∈ {work,business,other}, name, notes (≤10,000 chars, default ''), position, today (bool), today_position, urgency (1|2|3, default 2), done (bool), done_at, created_at)` — `done` only counts while the sub-category has no activities
 - `activities(id, subcategory_id → subcategories ON DELETE CASCADE, title, done, done_at, position, created_at)`
 - Categories are a CHECK constraint, not a table — they are fixed by design.
 
@@ -102,12 +106,12 @@ api/
 | GET | `/api/health` | – | runs `SELECT 1` (CI waits on this) |
 | GET | `/api/board` | – | all 3 categories, always, with nested sub-categories/activities |
 | POST | `/api/subcategories` | `{category, name, today?}` | 201; `today: true` also adds it to the bottom of Today |
-| PATCH | `/api/subcategories/:id` | `{name?, notes?, today?, urgency?}` | **partial** — omitted fields kept via `COALESCE`; empty notes clears them; joining Today puts it at the bottom; changing urgency *to* 1 moves it to the top of its category and of Today |
+| PATCH | `/api/subcategories/:id` | `{name?, notes?, today?, urgency?, done?}` | **partial** — `done` maintains `done_at`; — omitted fields kept via `COALESCE`; empty notes clears them; joining Today puts it at the bottom; a changed urgency re-ranks it just below everything more urgent, in its category and on Today (renumbers positions) |
 | PUT | `/api/today/order` | `{ids}` | sets `today_position` = index; ids not on Today ignored |
-| POST | `/api/today/clear-finished` | `{before}` (ISO, within a week of now) | sets `today = false` on fully ticked sub-categories whose last tick is before `before`; returns `{cleared: ids}` |
+| POST | `/api/today/clear-finished` | `{before}` (ISO, within a week of now) | sets `today = false` on sub-categories finished before `before` (all activities ticked, latest `done_at`; or, with no activities, `done` with `done_at`); returns `{cleared: ids}` |
 | PUT | `/api/subcategories/order` | `{category, ids}` | sets `position` = index; ids from other categories ignored |
 | DELETE | `/api/subcategories/:id` | – | cascades to activities |
-| POST | `/api/subcategories/:id/activities` | `{title}` | 404 if sub-category missing |
+| POST | `/api/subcategories/:id/activities` | `{title}` | 404 if sub-category missing; also resets the sub-category's own `done` |
 | PUT | `/api/subcategories/:id/activities/order` | `{ids}` | sets activity `position` = index; ids from other sub-categories ignored |
 | PATCH | `/api/activities/:id` | `{title?, done?}` | **partial** — omitted fields kept via `COALESCE`; `done_at` maintained |
 | DELETE | `/api/activities/:id` | – | |
@@ -137,6 +141,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
   - `mig-002`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000);`
   - `mig-003`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today BOOLEAN NOT NULL DEFAULT false;` and `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today_position INTEGER NOT NULL DEFAULT 0;`
   - `mig-004`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS urgency SMALLINT NOT NULL DEFAULT 2 CHECK (urgency IN (1, 2, 3));`
+  - **`mig-005` (not yet run on production, needed before merging the direct-completion PR):** `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done BOOLEAN NOT NULL DEFAULT false;` and `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done_at TIMESTAMPTZ;`
 
 ## Deploy rules
 - Deploys happen automatically on every merge to `main` (Workers Builds). Secrets set in the dashboard survive deploys; plain-text dashboard variables do not.
@@ -160,13 +165,16 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 ## Gotchas
 - Neon driver typing: use `neon<false, false>(...)` so results type as row arrays.
 - Activity tick is optimistic (`updateActivityInBoard`) — a controlled checkbox otherwise doesn't change until the API round-trip finishes, which feels laggy. The board reloads after every change, so a failed save corrects itself.
-- Sub-category completion is derived on the client (`activityProgress`); there is no `done` column on sub-categories.
+- Sub-category completion is decided by `isSubcategoryComplete` (activities if any, else the sub-category's own `done`). Use it, not `activityProgress(...).complete`, anywhere "finished" matters.
+- `mig-001` splits `schema.sql` into statements at lines ending in `;`. It now strips `--` comment lines first, but still avoid ending a comment line with `;` in `schema.sql`.
 - Workers Builds also builds every non-`main` branch as a **Preview**. Recent Wrangler refuses that unless the config has a `previews` block: `api/wrangler.toml` has `[previews.vars] ALLOWED_ORIGINS = ""` (previews get no `DATABASE_URL`, so they can't reach production data) and `frontend/wrangler.jsonc` has `"previews": {}`. Add any new `[vars]` to `[previews.vars]` too, with a preview-safe value.
 
 ## Open items
 - Authentication (see Security).
 
 ## Change log
+- **2026-11-23** — Urgency re-ranking extended: every urgency change moves the sub-category just below everything more urgent (2 below the 1s, 3 below the 2s), in its category and on Today. No schema change.
+- **2026-11-23** — Sub-categories with no activities can be ticked off directly (tick box replaces the `0/0` count). **Schema change:** `subcategories.done`, `done_at` via `mig-005` (also in `setup-database.sql`). Fixed `mig-001` breaking on a `;` at the end of a comment line, and the expected column count in `setup-database.sql`. Long names no longer push the rename pencil over the note icon on phones.
 - **2026-10-23** — Rule added: `CLAUDE.md`-only changes go straight to `main`; everything else still via pull request.
 - **2026-10-23** — Added "Working rules" (communication style, preview link every change, code rules, ask-first list, secrets) from the original starter prompt and Michael's preferences.
 - **2026-10-23** — Added `previews` blocks to both Wrangler configs; Cloudflare preview builds of PR branches failed without them.

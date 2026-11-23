@@ -21,7 +21,10 @@ export const api = {
   board: () => request<CategoryBoard[]>('GET', '/api/board'),
   createSubcategory: (category: CategoryKey, name: string, today = false) =>
     request<Subcategory>('POST', '/api/subcategories', { category, name, today }),
-  updateSubcategory: (id: number, changes: { name?: string; notes?: string; today?: boolean; urgency?: Urgency }) =>
+  updateSubcategory: (
+    id: number,
+    changes: { name?: string; notes?: string; today?: boolean; urgency?: Urgency; done?: boolean },
+  ) =>
     request<Subcategory>('PATCH', `/api/subcategories/${id}`, changes),
   /** Takes off Today everything finished before `before` (the client's local midnight). */
   clearFinishedToday: (before: Date) =>

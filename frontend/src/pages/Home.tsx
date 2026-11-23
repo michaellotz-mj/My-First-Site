@@ -9,7 +9,7 @@ import { api } from '../lib/api';
 import { localDayKey, startOfLocalDay } from '../lib/dates';
 import { CATEGORY_STYLES } from '../lib/categoryStyles';
 import {
-  activityProgress,
+  isSubcategoryComplete,
   categoriesForTab,
   nextTodayPosition,
   reorderTodayInBoard,
@@ -147,6 +147,15 @@ export default function Home() {
     [mutate],
   );
 
+  /** Ticks off (or reopens) a sub-category with no activities instantly on screen, then saves. */
+  const setDone = useCallback(
+    (id: number, done: boolean) => {
+      setBoard((b) => b && updateSubcategoryInBoard(b, id, { done }));
+      return mutate(() => api.updateSubcategory(id, { done }));
+    },
+    [mutate],
+  );
+
   /** Sets urgency instantly on screen (urgency 1 jumps to the top), then saves. */
   const setUrgency = useCallback(
     (id: number, urgency: Urgency) => {
@@ -176,15 +185,16 @@ export default function Home() {
       onSaveNotes: saveNotes,
       onSetToday: setToday,
       onSetUrgency: setUrgency,
+      onSetDone: setDone,
     }),
-    [mutate, toggleActivity, moveActivity, saveNotes, setToday, setUrgency],
+    [mutate, toggleActivity, moveActivity, saveNotes, setToday, setUrgency, setDone],
   );
 
   const today = board ? todayItems(board) : [];
   const visible = board ? categoriesForTab(board, tab) : [];
   const completed =
     tab === 'today'
-      ? today.filter((i) => activityProgress(i.sub.activities).complete)
+      ? today.filter((i) => isSubcategoryComplete(i.sub))
       : visible.flatMap((c) => splitCompleted(c.subcategories).completed.map((sub) => ({ sub, category: c })));
 
   return (

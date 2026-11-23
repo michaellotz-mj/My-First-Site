@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS subcategories (
   today_position  INTEGER NOT NULL DEFAULT 0,
   -- 1 = do first, 2 = important but not urgent (default), 3 = later.
   urgency     SMALLINT NOT NULL DEFAULT 2 CHECK (urgency IN (1, 2, 3)),
+  -- Ticked off directly. Only counts while the sub-category has no activities
+  -- (with activities, it is complete when every activity is done).
+  done        BOOLEAN NOT NULL DEFAULT false,
+  done_at     TIMESTAMPTZ,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -32,13 +36,15 @@ CREATE TABLE IF NOT EXISTS activities (
 
 CREATE INDEX IF NOT EXISTS activities_subcategory_idx ON activities (subcategory_id, position);
 
--- Columns added after the first version (mig-002, mig-003, mig-004). No-ops on a fresh database.
+-- Columns added after the first version (mig-002 … mig-005). No-ops on a fresh database.
 ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000);
 ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today_position INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS urgency SMALLINT NOT NULL DEFAULT 2 CHECK (urgency IN (1, 2, 3));
+ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done_at TIMESTAMPTZ;
 
--- Check: should list 2 tables and 15 columns in total.
+-- Check: should list 2 tables and 18 columns in total (11 in subcategories, 7 in activities).
 SELECT table_name, string_agg(column_name, ', ' ORDER BY ordinal_position) AS columns
 FROM information_schema.columns
 WHERE table_schema = 'public' AND table_name IN ('subcategories', 'activities')

@@ -44,17 +44,22 @@ export const URGENCIES = [1, 2, 3] as const;
 export type Urgency = (typeof URGENCIES)[number];
 
 /**
- * Partial update: send any of `name`, `notes`, `today`, `urgency`. Omitted fields come back as null
- * so the SQL can COALESCE them. Notes may be empty (clears them) and keep their whitespace and line breaks.
+ * Partial update: send any of `name`, `notes`, `today`, `urgency`, `done`. Omitted fields come back as
+ * null so the SQL can COALESCE them. Notes may be empty (clears them) and keep their whitespace and line breaks.
  */
-export function parseSubcategoryUpdate(
-  body: unknown,
-): Result<{ name: string | null; notes: string | null; today: boolean | null; urgency: Urgency | null }> {
+export function parseSubcategoryUpdate(body: unknown): Result<{
+  name: string | null;
+  notes: string | null;
+  today: boolean | null;
+  urgency: Urgency | null;
+  done: boolean | null;
+}> {
   if (!isObject(body)) return fail('body must be a JSON object');
   let name: string | null = null;
   let notes: string | null = null;
   let today: boolean | null = null;
   let urgency: Urgency | null = null;
+  let done: boolean | null = null;
   if (body.name !== undefined) {
     const n = text(body.name, 'name', 200);
     if (!n.ok) return n;
@@ -73,10 +78,14 @@ export function parseSubcategoryUpdate(
     if (!URGENCIES.includes(body.urgency as Urgency)) return fail('urgency must be 1, 2 or 3');
     urgency = body.urgency as Urgency;
   }
-  if (name === null && notes === null && today === null && urgency === null) {
-    return fail('send at least one of: name, notes, today, urgency');
+  if (body.done !== undefined) {
+    if (typeof body.done !== 'boolean') return fail('done must be a boolean');
+    done = body.done;
   }
-  return ok({ name, notes, today, urgency });
+  if (name === null && notes === null && today === null && urgency === null && done === null) {
+    return fail('send at least one of: name, notes, today, urgency, done');
+  }
+  return ok({ name, notes, today, urgency, done });
 }
 
 /** A non-empty list of unique positive ids, top first. */

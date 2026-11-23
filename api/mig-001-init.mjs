@@ -7,8 +7,10 @@ import { loadDatabaseUrl } from './mig-env.mjs';
 
 const sql = neon(loadDatabaseUrl());
 const statements = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
+    // Drop comment lines first, so a ";" inside a comment can't split a statement.
+  .replace(/^\s*--.*$/gm, '')
   .split(/;\s*$/m)
-  .map((s) => s.replace(/^\s*--.*$/gm, '').trim())
+  .map((s) => s.trim())
   .filter(Boolean);
 
 for (const stmt of statements) {
