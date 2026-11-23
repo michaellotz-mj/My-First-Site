@@ -55,8 +55,17 @@ export interface CategoryBoard {
 const byPosition = (a: { position: number; id: number }, b: { position: number; id: number }) =>
   a.position - b.position || a.id - b.id;
 
-/** Always returns all three categories, in fixed order, even when empty. */
-export function buildBoard(subs: SubcategoryRow[], acts: ActivityRow[]): CategoryBoard[] {
+export interface CategoryLabelRow {
+  category: Category;
+  label: string;
+}
+
+/**
+ * Always returns all three categories, in fixed order, even when empty. A category without a
+ * custom name (no `category_labels` row) gets its default name.
+ */
+export function buildBoard(subs: SubcategoryRow[], acts: ActivityRow[], labels: CategoryLabelRow[] = []): CategoryBoard[] {
+  const custom = new Map(labels.map((l) => [l.category, l.label]));
   const activitiesBySub = new Map<number, Activity[]>();
   for (const a of [...acts].sort(byPosition)) {
     const list = activitiesBySub.get(a.subcategory_id) ?? [];
@@ -65,7 +74,7 @@ export function buildBoard(subs: SubcategoryRow[], acts: ActivityRow[]): Categor
   }
   return CATEGORIES.map((key) => ({
     key,
-    label: CATEGORY_LABELS[key],
+    label: custom.get(key) ?? CATEGORY_LABELS[key],
     subcategories: subs
       .filter((s) => s.category === key)
       .sort(byPosition)

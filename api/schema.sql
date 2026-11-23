@@ -33,3 +33,11 @@ CREATE TABLE IF NOT EXISTS activities (
 );
 
 CREATE INDEX IF NOT EXISTS activities_subcategory_idx ON activities (subcategory_id, position);
+
+-- Custom names for the three fixed categories (shown on their tabs and headings). A missing row
+-- means the default name (Work, Business, Other). The CHECK keeps it to the three categories, so
+-- renaming can never add a tab.
+CREATE TABLE IF NOT EXISTS category_labels (
+  category  TEXT PRIMARY KEY CHECK (category IN ('work', 'business', 'other')),
+  label     TEXT NOT NULL CHECK (length(label) BETWEEN 1 AND 20)
+);

@@ -3,6 +3,8 @@ import {
   parseActivityReorder,
   parseClearBefore,
   parseActivityUpdate,
+  parseCategoryKey,
+  parseCategoryLabel,
   parseId,
   parseNewActivity,
   parseNewSubcategory,
@@ -139,4 +141,23 @@ describe('ticking a sub-category off directly', () => {
     expect(parseSubcategoryUpdate({ done: false }).ok).toBe(true);
   });
   it.each(['yes', 1, null])('rejects done = %j', (done) => expect(parseSubcategoryUpdate({ done }).ok).toBe(false));
+});
+
+describe('category renaming', () => {
+  it('accepts only the three fixed categories', () => {
+    expect(parseCategoryKey('work')).toBe('work');
+    expect(parseCategoryKey('other')).toBe('other');
+    expect(parseCategoryKey('today')).toBeNull();
+    expect(parseCategoryKey('all')).toBeNull();
+    expect(parseCategoryKey('personal')).toBeNull();
+  });
+
+  it('trims the name and requires 1 to 20 characters', () => {
+    expect(parseCategoryLabel({ label: '  Home  ' })).toEqual({ ok: true, value: { label: 'Home' } });
+    expect(parseCategoryLabel({ label: 'x'.repeat(20) }).ok).toBe(true);
+    expect(parseCategoryLabel({ label: 'x'.repeat(21) }).ok).toBe(false);
+    expect(parseCategoryLabel({ label: '   ' }).ok).toBe(false);
+    expect(parseCategoryLabel({ label: 5 }).ok).toBe(false);
+    expect(parseCategoryLabel(null).ok).toBe(false);
+  });
 });

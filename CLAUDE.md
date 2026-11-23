@@ -51,7 +51,7 @@ frontend/
   src/App.tsx              router (Wouter)
   src/pages/Home.tsx       the whole board (one page)
   src/pages/NotFound.tsx
-  src/components/          AddForm, EditableText, CategoryTabs (Today / All / Work / Business / Other), ConfirmDelete (+ .test.tsx),
+  src/components/          AddForm, EditableText, Logo (+ .test.tsx), RingMotif, CategoryTabs (Today / All / Work / Business / Other), ConfirmDelete (+ .test.tsx),
                            CompletedSection, Modal (shared <dialog>), NotesDialog (+ .test.tsx), Sortable (dnd-kit),
                            SubcategoryCard (+ CardActions), TodayView, AddToTodayDialog (+ .test.tsx), UrgencyBadge (+ .test.tsx)
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
@@ -75,6 +75,7 @@ api/
   mig-003-today.mjs        adds subcategories.today and today_position (idempotent)
   mig-004-urgency.mjs      adds subcategories.urgency (idempotent)
   mig-005-subcategory-done.mjs  adds subcategories.done and done_at (idempotent)
+  mig-006-category-labels.mjs   adds the category_labels table (idempotent)
   check-dev-vars.mjs       validates DATABASE_URL shape in .dev.vars without printing it (run in CI)
   integration.test.ts      live tests against wrangler dev
   wrangler.toml            NO secrets; ALLOWED_ORIGINS lives here
@@ -83,9 +84,9 @@ api/
 ```
 
 ## Look and feel
-- Branding: "Lotz Solutions" eyebrow above the "To Do List" title in a slate-teal header band; tab title "To Do List · Lotz Solutions".
-- Palette lives in `frontend/src/index.css` (`@theme`): cool-grey page, one muted hue per category (Work blue-grey, Business sage, Other sand). `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
-- Tabs: Today, All, Work, Business, Other, each with a done/total sub-category count. The selected tab is remembered in localStorage (`todo-tab`, try/catch, defaults to All). Arrow/Home/End keys move between tabs. On phones the count sits under the label (text-xs) so all five fit at 360px.
+- Branding matches the website lotzsolutions.com.au (repo `michaellotz-mj/Website`, `src/styles/global.css` and `Logo.astro`): very light teal header (`teal-mist` `#EAF5F2`, Michael's choice; the website's header is white) with the ring logo (`components/Logo.tsx`, a React port of `Logo.astro`), a divider, then "To Do List"; a 3px brand-teal line under the header (matches the rule under "Lotz"); ring favicon (`public/favicon.svg`), `theme-color` navy; a large faint ring in the background (`components/RingMotif.tsx`, port of the website's `RingMotif.astro`), fixed to the bottom-right (vertically centred on wide screens) at `z-0`, with the header and `<main>` at `relative z-10` so every box covers it; tab title "To Do List · Lotz Solutions".
+- Palette and font live in `frontend/src/index.css` (`@theme`), copied from the website: navy `#14284B`, teal `#1A9C8C` (`teal-text` `#13786C` for text/borders on white), mist page `#F6F8FB`, teal-mist header `#EAF5F2`, muted `#4A5B78`. Tailwind's `slate` scale is re-tinted to the brand navy, so existing `slate-*` classes follow the brand. Font: Manrope (`@fontsource-variable/manrope`, self-hosted, no Google request). Keyboard focus: 3px teal outline, like the website. Selected tab: white with a teal underline. Categories: Work navy, Business teal, Other sand. `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
+- Tabs: Today, All, Work, Business, Other, each with a done/total sub-category count. The selected tab is remembered in localStorage (`todo-tab`, try/catch, defaults to All). Arrow/Home/End keys move between tabs. On phones the count sits under the label (text-xs) and the dots/sun are hidden, so all five default names fit at 360px.
 - Deleting asks inline ("Delete? Yes / No", No focused, Escape cancels) via `ConfirmDelete`, for both activities and sub-categories. No browser `confirm()`: it is blocked in embedded previews.
 - Reorder: drag and drop by a grip handle (⋮⋮) on the left of each in-progress sub-category and each activity (handle shown when the list has 2+ items). Mouse, touch (handle has `touch-action: none`, so the page doesn't scroll) and keyboard (Space, arrows, Space; Escape cancels) via dnd-kit, with spoken announcements using item names. Drops apply optimistically, then save the full order: `PUT /api/subcategories/order` (completed ones keep their relative order at the end) or `PUT /api/subcategories/:id/activities/order`. Dragging between categories or sub-categories is not supported.
 - Completed section: fully ticked sub-categories leave their category and appear in one "Completed" section at the bottom of the current tab (tagged with their category, collapsed by default). It can be open, minimised or hidden (`todo-completed-view` in localStorage). Unticking moves a card back.
@@ -93,18 +94,21 @@ api/
 - Today: a shared list of sub-categories picked from any category (same records, not copies, so ticks show everywhere). Add via the ☀ toggle on any card, the "Add from your lists" picker (always lists Work, Business and Other: unfinished sub-categories with Add, ones already on Today marked "On Today", an empty-state line, and a "New … sub-category" box per category that creates straight onto Today), or "New task for today" (category select + name; `POST /api/subcategories {today: true}`). Today has its own drag order (`today_position`, `PUT /api/today/order`). Finished Today items show in Today's Completed section; "Clear finished from Today" sets `today: false` on them. Morning clear-out: on the first load of each local day (also when the app becomes visible again, and every 5 minutes, so an overnight tab clears too) the app calls `POST /api/today/clear-finished {before: local midnight}`, which takes off Today every sub-category whose activities were all ticked before that moment (latest `activities.done_at`). Unfinished items, empty ones, and ones finished today stay. Uses the device's own time zone; a failed clear-out never blocks loading. In mixed lists the category tag sits beside the progress bar.
 - Urgency: each sub-category has a 1 / 2 / 3 badge before its name (1 red "Do first", 2 amber "Important, not urgent" — the default, 3 grey "Can wait"). The badge is a transparent native `<select>` over the number, so phones show their own picker. Every urgency *change* re-ranks the sub-category just below the last unfinished, more-urgent item (1 → top, 2 → below the 1s, 3 → below the 2s), in its category and on Today. Rule: `placeByUrgency` in `api/src/urgency.ts` (server, in the PATCH) mirrored in `frontend/src/lib/progress.ts` (optimistic). After that, drag order wins; setting the same urgency again moves nothing. The Add-to-Today picker shows a read-only badge.
 - Direct completion: a sub-category with no activities shows a tick box (before the urgency badge) instead of the `0/0` count. Ticking it marks it finished everywhere (strike-through, Completed section, tab counts, Today, morning clear-out). Adding an activity re-opens it (the API resets `done` in the same statement), and from then on its activities decide.
-- Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
+- Category names: Work, Business and Other can be renamed (pencil at the right of the heading, before the done/total pill, in All and each category's tab; 1–20 characters, `MAX_CATEGORY_LABEL`). Saved in `category_labels` via `PUT /api/categories/:key`, optimistic via `renameCategoryInBoard`; the new name shows on the tab, heading, tags, pickers and "New … sub-category" boxes. The keys stay `work`/`business`/`other`, so data and colours are unaffected. Today and All can't be renamed, and no categories can be added (unknown keys 404; the table's CHECK allows only the three). Long names are cut off with "…" on tabs (full name on hover).
+- Colour is used for dots, count pills, tick boxes and the per-sub-category progress bar; urgency badge colours (red / amber / grey) are unchanged by the rebrand.
 
 ## Data model
 - `subcategories(id, category ∈ {work,business,other}, name, notes (≤10,000 chars, default ''), position, today (bool), today_position, urgency (1|2|3, default 2), done (bool), done_at, created_at)` — `done` only counts while the sub-category has no activities
 - `activities(id, subcategory_id → subcategories ON DELETE CASCADE, title, done, done_at, position, created_at)`
-- Categories are a CHECK constraint, not a table — they are fixed by design.
+- `category_labels(category PK ∈ {work,business,other}, label 1–20 chars)` — optional custom names; no row = default name
+- Categories are a CHECK constraint, not a table — they are fixed by design (renaming changes only the label).
 
 ## API
 | Method | Path | Body | Notes |
 |---|---|---|---|
 | GET | `/api/health` | – | runs `SELECT 1` (CI waits on this) |
-| GET | `/api/board` | – | all 3 categories, always, with nested sub-categories/activities |
+| GET | `/api/board` | – | all 3 categories, always, with nested sub-categories/activities; `label` = custom name or default |
+| PUT | `/api/categories/:key` | `{label}` | renames `work`, `business` or `other` (trimmed, 1–20 chars); any other key 404 — no new categories |
 | POST | `/api/subcategories` | `{category, name, today?}` | 201; `today: true` also adds it to the bottom of Today |
 | PATCH | `/api/subcategories/:id` | `{name?, notes?, today?, urgency?, done?}` | **partial** — `done` maintains `done_at`; — omitted fields kept via `COALESCE`; empty notes clears them; joining Today puts it at the bottom; a changed urgency re-ranks it just below everything more urgent, in its category and on Today (renumbers positions) |
 | PUT | `/api/today/order` | `{ids}` | sets `today_position` = index; ids not on Today ignored |
@@ -141,6 +145,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
   - `mig-002`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '' CHECK (length(notes) <= 10000);`
   - `mig-003`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today BOOLEAN NOT NULL DEFAULT false;` and `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS today_position INTEGER NOT NULL DEFAULT 0;`
   - `mig-004`: `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS urgency SMALLINT NOT NULL DEFAULT 2 CHECK (urgency IN (1, 2, 3));`
+  - `mig-006` (**needed before merging the category-rename PR**): `CREATE TABLE IF NOT EXISTS category_labels (category TEXT PRIMARY KEY CHECK (category IN ('work', 'business', 'other')), label TEXT NOT NULL CHECK (length(label) BETWEEN 1 AND 20));`
   - `mig-005` (**applied to production 2026-11-23**): `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done BOOLEAN NOT NULL DEFAULT false;` and `ALTER TABLE subcategories ADD COLUMN IF NOT EXISTS done_at TIMESTAMPTZ;`
 
 ## Deploy rules
@@ -163,6 +168,8 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - **No authentication yet (by Michael's choice).** Anyone who finds the URLs can read/edit the list. Recommended fix when wanted: Cloudflare Access (free, email one-time code) in front of both Workers — no app code needed.
 
 ## Gotchas
+- Background ring: don't use a negative z-index for it — it disappears behind any page background (it did in the preview). Keep it at `z-0` under `relative z-10` content.
+- Rename pencils (`EditableText`): with a mouse they appear on hover or keyboard focus (`[@media(hover:hover)]:opacity-0`); touch screens can't hover, so there they are always shown. Don't go back to `sm:opacity-0` — iPads are wider than `sm` and the pencil was invisible there. Category headings pass `pencilAlways` and `pencilRight`; sub-category and activity rows pass `pencilRight`: the name fills the row and the pencil sits at its right end, just before the done/total pill (category), the notes icon (sub-category) or the bin (activity).
 - Neon driver typing: use `neon<false, false>(...)` so results type as row arrays.
 - Activity tick is optimistic (`updateActivityInBoard`) — a controlled checkbox otherwise doesn't change until the API round-trip finishes, which feels laggy. The board reloads after every change, so a failed save corrects itself.
 - Sub-category completion is decided by `isSubcategoryComplete` (activities if any, else the sub-category's own `done`). Use it, not `activityProgress(...).complete`, anywhere "finished" matters.
@@ -173,6 +180,8 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-11-23** — Work, Business and Other can be renamed (pencil on the heading); Today and All stay fixed and no categories can be added. **Schema change:** new `category_labels` table via `mig-006` (also in `setup-database.sql`, now 3 tables / 20 columns). New `PUT /api/categories/:key`. Long names truncate on tabs. Fixed: rename pencils were invisible on iPads (hover-only above phone width). Rename pencils moved to the right on categories (next to the count), sub-categories (next to notes) and activities (next to delete).
+- **2026-11-23** — Rebranded to match lotzsolutions.com.au: ring logo in a very light teal header, Manrope font, navy/teal/mist palette (slate re-tinted), teal tab underline and focus outline, teal line under the header, ring favicon, faint background ring (behind all boxes). Frontend only; no schema or API change.
 - **2026-11-23** — PR #6 live: direct completion and urgency re-ranking; `mig-005` applied to production first. Michael confirmed the live app works.
 - **2026-11-23** — Urgency re-ranking extended: every urgency change moves the sub-category just below everything more urgent (2 below the 1s, 3 below the 2s), in its category and on Today. No schema change.
 - **2026-11-23** — Sub-categories with no activities can be ticked off directly (tick box replaces the `0/0` count). **Schema change:** `subcategories.done`, `done_at` via `mig-005` (also in `setup-database.sql`). Fixed `mig-001` breaking on a `;` at the end of a comment line, and the expected column count in `setup-database.sql`. Long names no longer push the rename pencil over the note icon on phones.

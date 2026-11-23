@@ -31,13 +31,13 @@ export default function AddForm({ placeholder, onAdd }: Props) {
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+        className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:border-teal-text focus:outline-none"
       />
       <button
         type="submit"
         disabled={!value.trim() || busy}
         aria-label={placeholder}
-        className="rounded-md p-1 text-blue-600 hover:bg-blue-50 disabled:text-slate-300"
+        className="rounded-md p-1 text-teal-text hover:bg-teal/10 disabled:text-slate-300"
       >
         <Plus size={18} />
       </button>

@@ -26,6 +26,9 @@ export const api = {
     changes: { name?: string; notes?: string; today?: boolean; urgency?: Urgency; done?: boolean },
   ) =>
     request<Subcategory>('PATCH', `/api/subcategories/${id}`, changes),
+  /** Renames Work, Business or Other (1-20 characters). Today and All can't be renamed. */
+  renameCategory: (key: CategoryKey, label: string) =>
+    request<{ key: CategoryKey; label: string }>('PUT', `/api/categories/${key}`, { label }),
   /** Takes off Today everything finished before `before` (the client's local midnight). */
   clearFinishedToday: (before: Date) =>
     request<{ cleared: number[] }>('POST', '/api/today/clear-finished', { before: before.toISOString() }),

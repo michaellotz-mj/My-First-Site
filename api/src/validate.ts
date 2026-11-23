@@ -137,6 +137,21 @@ export function parseActivityReorder(body: unknown): Result<{ ids: number[] }> {
   return ok({ ids: ids.value });
 }
 
+export const MAX_CATEGORY_LABEL = 20;
+
+/** One of the three fixed categories, from the URL. Anything else is unknown (404): no new tabs. */
+export function parseCategoryKey(raw: string): Category | null {
+  return CATEGORIES.includes(raw as Category) ? (raw as Category) : null;
+}
+
+/** New display name for a category: 1–20 characters so it fits on a phone tab. */
+export function parseCategoryLabel(body: unknown): Result<{ label: string }> {
+  if (!isObject(body)) return fail('body must be a JSON object');
+  const label = text(body.label, 'label', MAX_CATEGORY_LABEL);
+  if (!label.ok) return label;
+  return ok({ label: label.value });
+}
+
 export function parseNewActivity(body: unknown): Result<{ title: string }> {
   if (!isObject(body)) return fail('body must be a JSON object');
   const title = text(body.title, 'title', 500);

@@ -23,7 +23,7 @@ export default function CategoryTabs({ board, tab, onChange }: Props) {
     {
       key: 'all',
       label: 'All',
-      dot: 'bg-brand',
+      dot: 'bg-muted',
       ...subcategoryProgress(board.flatMap((c) => c.subcategories)),
     },
     ...board.map((c) => ({
@@ -71,19 +71,24 @@ export default function CategoryTabs({ board, tab, onChange }: Props) {
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(t.key)}
             onKeyDown={(e) => onKeyDown(e, i)}
-            className={`flex min-w-0 flex-col items-center justify-center rounded-md px-0.5 py-1.5 text-xs font-medium sm:text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-brand sm:flex-row sm:gap-1.5 sm:px-3 ${
-              selected ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:bg-white/70'
+            title={t.label}
+            className={`flex min-w-0 flex-col items-center justify-center rounded-md px-0.5 py-1.5 text-xs font-medium sm:text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-brand sm:flex-row sm:gap-1.5 sm:px-2 ${
+              // Selected tab: white with the website's teal underline.
+              selected
+                ? 'bg-white font-semibold text-navy shadow-[inset_0_-3px_0_var(--color-teal),0_1px_2px_rgb(20_40_75/0.08)]'
+                : 'text-slate-600 hover:bg-white/70'
             }`}
           >
-            <span className="flex items-center gap-1.5">
+            <span className="flex max-w-full min-w-0 items-center gap-1.5">
               {t.key === 'today' ? (
-                <Sun size={12} aria-hidden="true" className="shrink-0 text-amber-500" />
+                <Sun size={12} aria-hidden="true" className="hidden shrink-0 text-amber-500 sm:block" />
               ) : (
-                <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${t.dot}`} />
+                <span aria-hidden="true" className={`hidden h-2 w-2 shrink-0 rounded-full sm:block ${t.dot}`} />
               )}
-              {t.label}
+              {/* Custom names can be long: cut off with "…" (full name on hover). */}
+              <span className="truncate">{t.label}</span>
             </span>
-            <span className="text-[11px] text-slate-500 tabular-nums sm:text-xs">
+            <span className="shrink-0 text-[11px] text-slate-500 tabular-nums sm:text-xs">
               {t.done}/{t.total}
             </span>
           </button>

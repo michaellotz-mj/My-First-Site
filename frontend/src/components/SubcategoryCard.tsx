@@ -84,6 +84,7 @@ export default function SubcategoryCard({
           struck={complete}
           label={sub.name}
           className="font-medium"
+          pencilRight
           onSave={(name) => mutate(() => api.updateSubcategory(sub.id, { name }))}
         />
         <button
@@ -179,6 +180,7 @@ export default function SubcategoryCard({
                         struck={a.done}
                         label={a.title}
                         className="text-sm"
+                        pencilRight
                         onSave={(title) => mutate(() => api.updateActivity(a.id, { title }))}
                       />
                       <ConfirmDelete label={a.title} onConfirm={() => mutate(() => api.deleteActivity(a.id))} />

@@ -1,18 +1,54 @@
-@import "tailwindcss";
+@import '@fontsource-variable/manrope';
+@import 'tailwindcss';
 
-/* Lotz Solutions palette: cool neutrals, one muted hue per category. */
+/*
+ * Lotz Solutions brand, matching lotzsolutions.com.au (michaellotz-mj/Website, src/styles/global.css).
+ * Brand colours and fonts live here, and only here.
+ */
 @theme {
-  --color-page: #eef1f3;
-  --color-brand: #2c4a52;
-  --color-brand-soft: #b9cfd3;
-  --color-work: #3f6b8f;
-  --color-work-soft: #e2ebf3;
-  --color-business: #4d7a5e;
-  --color-business-soft: #e2eee5;
+  /* Brand palette (from the approved logo) */
+  --color-navy: #14284b; /* text and headings */
+  --color-teal: #1a9c8c; /* logo, lines, decoration */
+  --color-teal-text: #13786c; /* buttons, links, focus: readable on white (5.3:1) */
+  --color-mist: #f6f8fb; /* page background */
+  --color-teal-mist: #eaf5f2; /* very light brand teal: header background */
+  --color-muted: #4a5b78; /* secondary text */
+  --color-brand: #13786c; /* primary buttons and focus outlines (= teal-text) */
+
+  /* The app's greys ("slate") re-tinted towards the brand navy, so every border,
+     muted label and hover state matches the website without renaming classes. */
+  --color-slate-50: #f6f8fb;
+  --color-slate-100: #edf1f6;
+  --color-slate-200: #dde3ec;
+  --color-slate-300: #c4cddb;
+  --color-slate-400: #8e9bb1;
+  --color-slate-500: #5d6d89; /* 5.1:1 on white */
+  --color-slate-600: #4a5b78;
+  --color-slate-700: #2f4263;
+  --color-slate-800: #14284b;
+  --color-slate-900: #0d1c37;
+
+  /* One colour per category: two from the brand, plus a warm sand so all three stay distinct. */
+  --color-work: #14284b;
+  --color-work-soft: #e6ebf3;
+  --color-business: #13786c;
+  --color-business-soft: #e0f2ef;
   --color-other: #8a6a3f;
   --color-other-soft: #f2ebdf;
+
+  --font-sans: 'Manrope Variable', 'Helvetica Neue', Arial, sans-serif;
 }
 
 body {
-  background: var(--color-page);
+  background: var(--color-mist);
+  color: var(--color-navy);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Keyboard focus: the website's thick teal outline. */
+:focus-visible {
+  outline: 3px solid var(--color-teal-text);
+  outline-offset: 2px;
+  border-radius: 2px;
 }

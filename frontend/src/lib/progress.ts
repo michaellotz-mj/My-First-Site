@@ -145,6 +145,14 @@ export function updateSubcategoryInBoard(
   }));
 }
 
+/** Longest category name: keeps all five tabs readable on a phone. Mirrors the API's limit. */
+export const MAX_CATEGORY_LABEL = 20;
+
+/** Shows a category's new name straight away (its tab, heading and tags), before the save finishes. */
+export function renameCategoryInBoard(board: CategoryBoard[], key: CategoryKey, label: string): CategoryBoard[] {
+  return board.map((c) => (c.key === key ? { ...c, label } : c));
+}
+
 /**
  * New id order (top first) after `id` changes to `urgency`: just below the last unfinished item that is
  * more urgent, or the top if there is none (1 → top, 2 → below the 1s, 3 → below the 2s).

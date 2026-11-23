@@ -27,7 +27,7 @@ export default function AddToTodayDialog({ board, onAdd, onCreate, onClose }: Pr
     <Modal labelledBy="add-today-title" onClose={onClose} initialFocus={doneRef}>
       <div className="flex max-h-[85vh] flex-col">
         <div className="flex items-center justify-between gap-2 border-b border-slate-200 p-4">
-          <h2 id="add-today-title" className="text-lg font-semibold">
+          <h2 id="add-today-title" className="text-lg font-bold tracking-tight">
             Add to Today
           </h2>
           <button

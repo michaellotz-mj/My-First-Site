@@ -29,7 +29,7 @@ export default function TodayView({ board, items, actions, onReorder, onCreate, 
   return (
     <section aria-labelledby="today-heading" className="space-y-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-300/70 pb-1.5">
-        <h2 id="today-heading" className="flex items-baseline gap-2 text-lg font-semibold">
+        <h2 id="today-heading" className="flex items-baseline gap-2 text-lg font-bold tracking-tight">
           <Sun size={16} aria-hidden="true" className="self-center text-amber-500" />
           Today
           <span className="text-sm font-normal text-slate-500">{dateLabel()}</span>

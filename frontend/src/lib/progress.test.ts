@@ -6,6 +6,7 @@ import {
   moveIdTo,
   moveSubcategory,
   nextTodayPosition,
+  renameCategoryInBoard,
   reorderTodayInBoard,
   setUrgencyInBoard,
   todayItems,
@@ -118,6 +119,21 @@ describe('updateSubcategoryInBoard', () => {
     expect(next[0].subcategories[1].notes).toBe('Call Sam');
     expect(next[0].subcategories[0]).toBe(board[0].subcategories[0]);
     expect(board[0].subcategories[1].notes).toBe('');
+  });
+});
+
+describe('renameCategoryInBoard', () => {
+  it('renames only that category and keeps its key and sub-categories', () => {
+    const b = [
+      { key: 'work' as const, label: 'Work', subcategories: [sub(1)] },
+      { key: 'business' as const, label: 'Business', subcategories: [sub(2)] },
+      { key: 'other' as const, label: 'Other', subcategories: [] },
+    ];
+    const renamed = renameCategoryInBoard(b, 'business', 'Lotz Solutions');
+    expect(renamed.map((c) => c.label)).toEqual(['Work', 'Lotz Solutions', 'Other']);
+    expect(renamed[1].key).toBe('business');
+    expect(renamed[1].subcategories).toBe(b[1].subcategories);
+    expect(b[1].label).toBe('Business');
   });
 });
 
