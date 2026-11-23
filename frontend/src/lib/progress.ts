@@ -137,7 +137,7 @@ export function reorderActivitiesInBoard(board: CategoryBoard[], subcategoryId: 
 export function updateSubcategoryInBoard(
   board: CategoryBoard[],
   id: number,
-  changes: Partial<Pick<Subcategory, 'name' | 'notes' | 'today' | 'todayPosition' | 'done'>>,
+  changes: Partial<Pick<Subcategory, 'name' | 'notes' | 'today' | 'todayPosition' | 'done' | 'urgency'>>,
 ): CategoryBoard[] {
   return board.map((c) => ({
     ...c,
@@ -146,25 +146,33 @@ export function updateSubcategoryInBoard(
 }
 
 /**
- * Returns a new board with one sub-category's urgency changed. Becoming urgency 1 also moves it to
- * the top of its category and of Today (matching the API); other changes leave it where it is.
+ * New id order (top first) after `id` changes to `urgency`: just below the last unfinished item that is
+ * more urgent, or the top if there is none (1 → top, 2 → below the 1s, 3 → below the 2s).
+ * Mirrors `placeByUrgency` in the API.
+ */
+export function placeByUrgency(subs: Subcategory[], id: number, urgency: Urgency): number[] {
+  const others = subs.filter((s) => s.id !== id);
+  let at = 0;
+  others.forEach((s, index) => {
+    if (!isSubcategoryComplete(s) && s.urgency < urgency) at = index + 1;
+  });
+  return [...others.slice(0, at).map((s) => s.id), id, ...others.slice(at).map((s) => s.id)];
+}
+
+/**
+ * Returns a new board with one sub-category's urgency changed and, if it changed, the sub-category
+ * re-ranked in its category and on Today (matching the API). Setting the same urgency moves nothing.
  */
 export function setUrgencyInBoard(board: CategoryBoard[], id: number, urgency: Urgency): CategoryBoard[] {
   const current = board.flatMap((c) => c.subcategories).find((s) => s.id === id);
   if (!current) return board;
-  const jumps = urgency === 1 && current.urgency !== 1;
-  const topOfToday = Math.min(...todayItems(board).map((i) => i.sub.todayPosition)) - 1;
-  return board.map((c) => {
-    if (!c.subcategories.some((s) => s.id === id)) return c;
-    const updated = {
-      ...current,
-      urgency,
-      todayPosition: jumps && current.today ? topOfToday : current.todayPosition,
-    };
-    const others = c.subcategories.filter((s) => s.id !== id);
-    const subcategories = jumps
-      ? [updated, ...others]
-      : c.subcategories.map((s) => (s.id === id ? updated : s));
-    return { ...c, subcategories };
-  });
+  if (current.urgency === urgency) return board;
+  const category = board.find((c) => c.subcategories.includes(current))!;
+  let next = updateSubcategoryInBoard(board, id, { urgency });
+  const updatedCategory = next.find((c) => c.key === category.key)!;
+  next = reorderInBoard(next, category.key, placeByUrgency(updatedCategory.subcategories, id, urgency));
+  if (current.today) {
+    next = reorderTodayInBoard(next, placeByUrgency(todayItems(next).map((i) => i.sub), id, urgency));
+  }
+  return next;
 }

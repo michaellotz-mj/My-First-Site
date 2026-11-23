@@ -186,6 +186,31 @@ describe('To Do API', () => {
     expect(unticked.data.done).toBe(false);
   });
 
+  it('re-ranks on every urgency change: 1 to the top, 2 below the 1s, 3 below the 2s', async () => {
+    const ids: number[] = [];
+    for (const n of ['p', 'q', 'r']) {
+      const { data } = await api('POST', '/api/subcategories', { category: 'business', name: `${TAG} ${n}` });
+      ids.push(data.id);
+      extraIds.push(data.id);
+    }
+    const [p, q, r] = ids;
+    await api('PUT', '/api/subcategories/order', { category: 'business', ids: [p, q, r] });
+    const order = async () => {
+      const { data: board } = await api('GET', '/api/board');
+      return board.find((c: any) => c.key === 'business').subcategories.map((s: any) => s.id).filter((id: number) => ids.includes(id));
+    };
+    await api('PATCH', `/api/subcategories/${r}`, { urgency: 1 });
+    expect(await order()).toEqual([r, p, q]);
+    await api('PATCH', `/api/subcategories/${p}`, { urgency: 3 });
+    expect(await order()).toEqual([r, q, p]);
+    await api('PATCH', `/api/subcategories/${p}`, { urgency: 2 });
+    expect(await order()).toEqual([r, p, q]);
+    // Same urgency again: stays where the user dragged it.
+    await api('PUT', '/api/subcategories/order', { category: 'business', ids: [q, p, r] });
+    await api('PATCH', `/api/subcategories/${p}`, { urgency: 2 });
+    expect(await order()).toEqual([q, p, r]);
+  });
+
   it('rejects invalid input with 400 and unknown ids with 404', async () => {
     expect((await api('POST', '/api/subcategories', { category: 'nope', name: 'x' })).status).toBe(400);
     expect((await api('PATCH', '/api/activities/abc', { done: true })).status).toBe(400);

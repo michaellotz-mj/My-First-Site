@@ -66,6 +66,7 @@ api/
   src/validate.ts          pure input validation (+ .test.ts)
   src/board.ts             pure row → nested board shaping (+ .test.ts)
   src/redact.ts            strips connection strings from logged errors (+ .test.ts)
+  src/urgency.ts           placeByUrgency: where a sub-category goes when its urgency changes (+ .test.ts)
   schema.sql               reference schema (source of truth)
   setup-database.sql       one-paste, idempotent setup/upgrade for a database in the Neon SQL Editor
   mig-env.mjs              shared loader: DATABASE_URL from .dev.vars for the mig-*.mjs scripts
@@ -90,7 +91,7 @@ api/
 - Completed section: fully ticked sub-categories leave their category and appear in one "Completed" section at the bottom of the current tab (tagged with their category, collapsed by default). It can be open, minimised or hidden (`todo-completed-view` in localStorage). Unticking moves a card back.
 - Notes: a note icon on each sub-category (category-coloured and filled when it has notes) opens a modal `<dialog>` with a textarea. Save (or Ctrl/Cmd+Enter) saves; Cancel, Escape or clicking outside discards. Saved optimistically via `PATCH /api/subcategories/:id {notes}`.
 - Today: a shared list of sub-categories picked from any category (same records, not copies, so ticks show everywhere). Add via the ☀ toggle on any card, the "Add from your lists" picker (always lists Work, Business and Other: unfinished sub-categories with Add, ones already on Today marked "On Today", an empty-state line, and a "New … sub-category" box per category that creates straight onto Today), or "New task for today" (category select + name; `POST /api/subcategories {today: true}`). Today has its own drag order (`today_position`, `PUT /api/today/order`). Finished Today items show in Today's Completed section; "Clear finished from Today" sets `today: false` on them. Morning clear-out: on the first load of each local day (also when the app becomes visible again, and every 5 minutes, so an overnight tab clears too) the app calls `POST /api/today/clear-finished {before: local midnight}`, which takes off Today every sub-category whose activities were all ticked before that moment (latest `activities.done_at`). Unfinished items, empty ones, and ones finished today stay. Uses the device's own time zone; a failed clear-out never blocks loading. In mixed lists the category tag sits beside the progress bar.
-- Urgency: each sub-category has a 1 / 2 / 3 badge before its name (1 red "Do first", 2 amber "Important, not urgent" — the default, 3 grey "Can wait"). The badge is a transparent native `<select>` over the number, so phones show their own picker. Changing *to* 1 moves the sub-category to the top of its category and of Today (server-side in the PATCH, mirrored optimistically by `setUrgencyInBoard`); after that, drag order wins. Changing to 2 or 3, or setting 1 again, does not move it. The Add-to-Today picker shows a read-only badge.
+- Urgency: each sub-category has a 1 / 2 / 3 badge before its name (1 red "Do first", 2 amber "Important, not urgent" — the default, 3 grey "Can wait"). The badge is a transparent native `<select>` over the number, so phones show their own picker. Every urgency *change* re-ranks the sub-category just below the last unfinished, more-urgent item (1 → top, 2 → below the 1s, 3 → below the 2s), in its category and on Today. Rule: `placeByUrgency` in `api/src/urgency.ts` (server, in the PATCH) mirrored in `frontend/src/lib/progress.ts` (optimistic). After that, drag order wins; setting the same urgency again moves nothing. The Add-to-Today picker shows a read-only badge.
 - Direct completion: a sub-category with no activities shows a tick box (before the urgency badge) instead of the `0/0` count. Ticking it marks it finished everywhere (strike-through, Completed section, tab counts, Today, morning clear-out). Adding an activity re-opens it (the API resets `done` in the same statement), and from then on its activities decide.
 - Text colours and fonts are deliberately unchanged; colour is used for dots, count pills, tick boxes and the per-sub-category progress bar.
 
@@ -105,7 +106,7 @@ api/
 | GET | `/api/health` | – | runs `SELECT 1` (CI waits on this) |
 | GET | `/api/board` | – | all 3 categories, always, with nested sub-categories/activities |
 | POST | `/api/subcategories` | `{category, name, today?}` | 201; `today: true` also adds it to the bottom of Today |
-| PATCH | `/api/subcategories/:id` | `{name?, notes?, today?, urgency?, done?}` | **partial** — `done` maintains `done_at`; — omitted fields kept via `COALESCE`; empty notes clears them; joining Today puts it at the bottom; changing urgency *to* 1 moves it to the top of its category and of Today |
+| PATCH | `/api/subcategories/:id` | `{name?, notes?, today?, urgency?, done?}` | **partial** — `done` maintains `done_at`; — omitted fields kept via `COALESCE`; empty notes clears them; joining Today puts it at the bottom; a changed urgency re-ranks it just below everything more urgent, in its category and on Today (renumbers positions) |
 | PUT | `/api/today/order` | `{ids}` | sets `today_position` = index; ids not on Today ignored |
 | POST | `/api/today/clear-finished` | `{before}` (ISO, within a week of now) | sets `today = false` on sub-categories finished before `before` (all activities ticked, latest `done_at`; or, with no activities, `done` with `done_at`); returns `{cleared: ids}` |
 | PUT | `/api/subcategories/order` | `{category, ids}` | sets `position` = index; ids from other categories ignored |
@@ -172,6 +173,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-11-23** — Urgency re-ranking extended: every urgency change moves the sub-category just below everything more urgent (2 below the 1s, 3 below the 2s), in its category and on Today. No schema change.
 - **2026-11-23** — Sub-categories with no activities can be ticked off directly (tick box replaces the `0/0` count). **Schema change:** `subcategories.done`, `done_at` via `mig-005` (also in `setup-database.sql`). Fixed `mig-001` breaking on a `;` at the end of a comment line, and the expected column count in `setup-database.sql`. Long names no longer push the rename pencil over the note icon on phones.
 - **2026-10-23** — Rule added: `CLAUDE.md`-only changes go straight to `main`; everything else still via pull request.
 - **2026-10-23** — Added "Working rules" (communication style, preview link every change, code rules, ask-first list, secrets) from the original starter prompt and Michael's preferences.

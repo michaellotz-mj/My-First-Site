@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { buildBoard, type ActivityRow, type SubcategoryRow } from './board';
 import { redactSecrets } from './redact';
+import { placeByUrgency, type Ranked } from './urgency';
 import {
   parseActivityReorder,
   parseActivityUpdate,
@@ -48,6 +49,37 @@ const notFound = () => json({ error: 'not found' }, 404);
 /** Runs a handler only if validation passed; otherwise returns 400. */
 function validated<T>(result: Result<T>, run: (value: T) => Promise<Response>): Promise<Response> {
   return result.ok ? run(result.value) : Promise.resolve(badRequest(result.error));
+}
+
+/** Re-orders the sub-category's category list, and Today if it is on Today, per `placeByUrgency`. */
+async function placeAfterUrgencyChange(sql: Sql, id: number, urgency: number): Promise<void> {
+  const rows = (await sql`
+    SELECT s.id, s.category, s.urgency, s.today, s.position, s.today_position,
+      CASE WHEN COUNT(a.id) = 0 THEN s.done ELSE BOOL_AND(a.done) END AS complete
+    FROM subcategories s
+    LEFT JOIN activities a ON a.subcategory_id = s.id
+    WHERE s.category = (SELECT category FROM subcategories WHERE id = ${id}) OR s.today
+    GROUP BY s.id`) as (Ranked & { category: string; today: boolean; position: number; today_position: number })[];
+  const self = rows.find((r) => r.id === id);
+  if (!self) return;
+
+  const inCategory = rows
+    .filter((r) => r.category === self.category)
+    .sort((a, b) => a.position - b.position || a.id - b.id);
+  const categoryIds = placeByUrgency(inCategory, id, urgency);
+  await sql`
+    UPDATE subcategories s SET position = o.ord
+    FROM unnest(${categoryIds}::int[]) WITH ORDINALITY AS o(id, ord)
+    WHERE s.id = o.id`;
+
+  if (self.today) {
+    const onToday = rows.filter((r) => r.today).sort((a, b) => a.today_position - b.today_position || a.id - b.id);
+    const todayIds = placeByUrgency(onToday, id, urgency);
+    await sql`
+      UPDATE subcategories s SET today_position = o.ord
+      FROM unnest(${todayIds}::int[]) WITH ORDINALITY AS o(id, ord)
+      WHERE s.id = o.id AND s.today`;
+  }
 }
 
 const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
@@ -146,23 +178,16 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       validated(parseId(params[0]), (id) =>
         // Partial update: null fields keep their current value.
         validated(parseSubcategoryUpdate(body), async ({ name, notes, today, urgency, done }) => {
-          // Joining Today puts it at the bottom of the Today list. Becoming urgency 1 moves it to the
-          // top of its category and of Today; after that the user's drag order wins.
-          // (Right-hand sides see the row's old values.)
-          const rows = await sql`
+          const before = await sql`SELECT urgency FROM subcategories WHERE id = ${id}`;
+          if (!before.length) return notFound();
+          // Joining Today puts it at the bottom of the Today list. (Right-hand sides see old values.)
+          await sql`
             UPDATE subcategories SET
               name = COALESCE(${name}::text, name),
               notes = COALESCE(${notes}::text, notes),
-              position = CASE
-                WHEN ${urgency}::smallint = 1 AND urgency <> 1
-                  THEN (SELECT MIN(s.position) - 1 FROM subcategories s WHERE s.category = subcategories.category)
-                ELSE position
-              END,
               today_position = CASE
                 WHEN ${today}::boolean AND NOT today
                   THEN (SELECT COALESCE(MAX(today_position), 0) + 1 FROM subcategories WHERE today)
-                WHEN ${urgency}::smallint = 1 AND urgency <> 1 AND today
-                  THEN (SELECT MIN(today_position) - 1 FROM subcategories WHERE today)
                 ELSE today_position
               END,
               today = COALESCE(${today}::boolean, today),
@@ -173,8 +198,13 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
                 ELSE NULL
               END,
               done = COALESCE(${done}::boolean, done)
-            WHERE id = ${id}
-            RETURNING id, category, name, notes, today, today_position AS "todayPosition", urgency, done`;
+            WHERE id = ${id}`;
+          // A changed urgency re-ranks it: just below everything more urgent, in its category and on
+          // Today. Setting the same urgency again leaves it where the user put it.
+          if (urgency !== null && urgency !== before[0].urgency) await placeAfterUrgencyChange(sql, id, urgency);
+          const rows = await sql`
+            SELECT id, category, name, notes, today, today_position AS "todayPosition", urgency, done
+            FROM subcategories WHERE id = ${id}`;
           return rows.length ? json(rows[0]) : notFound();
         }),
       ),
