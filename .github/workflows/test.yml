@@ -23,6 +23,12 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    # One run at a time against the shared Neon dev database. Two runs at once (e.g. a push to main and
+    # to a branch seconds apart) clear and re-order each other's test data, so random tests failed.
+    # Later runs wait their turn instead of being cancelled.
+    concurrency:
+      group: neon-dev-database
+      cancel-in-progress: false
     defaults:
       run:
         working-directory: api
