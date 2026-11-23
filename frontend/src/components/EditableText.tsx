@@ -8,11 +8,13 @@ interface Props {
   label: string;
   /** Longest name allowed while typing (the server checks it too). */
   maxLength?: number;
+  /** Always show the pencil, even with a mouse (otherwise it appears on hover). */
+  pencilAlways?: boolean;
   onSave: (value: string) => Promise<void>;
 }
 
 /** Text with a pencil button that switches to an inline rename input. */
-export default function EditableText({ value, struck, className = '', label, maxLength, onSave }: Props) {
+export default function EditableText({ value, struck, className = '', label, maxLength, pencilAlways = false, onSave }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
@@ -55,7 +57,11 @@ export default function EditableText({ value, struck, className = '', label, max
           setDraft(value);
           setEditing(true);
         }}
-        className="shrink-0 p-1 text-slate-300 hover:text-slate-600 sm:opacity-0 sm:group-hover:opacity-100"
+        // With a mouse the pencil appears on hover (or keyboard focus). Touch screens (phones, iPads)
+        // can't hover, so there it is always shown.
+        className={`shrink-0 p-1 text-slate-400 hover:text-slate-600 ${
+          pencilAlways ? '' : '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100'
+        }`}
       >
         <Pencil size={14} />
       </button>

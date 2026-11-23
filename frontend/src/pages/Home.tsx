@@ -266,6 +266,7 @@ export default function Home() {
                       value={category.label}
                       label={`category ${category.label}`}
                       maxLength={MAX_CATEGORY_LABEL}
+                      pencilAlways
                       onSave={(label) => renameCategory(category.key, label)}
                     />
                   </h2>

@@ -72,7 +72,7 @@ export default function CategoryTabs({ board, tab, onChange }: Props) {
             onClick={() => onChange(t.key)}
             onKeyDown={(e) => onKeyDown(e, i)}
             title={t.label}
-            className={`flex min-w-0 flex-col items-center justify-center rounded-md px-0.5 py-1.5 text-xs font-medium sm:text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-brand sm:flex-row sm:gap-1.5 sm:px-3 ${
+            className={`flex min-w-0 flex-col items-center justify-center rounded-md px-0.5 py-1.5 text-xs font-medium sm:text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-brand sm:flex-row sm:gap-1.5 sm:px-2 ${
               // Selected tab: white with the website's teal underline.
               selected
                 ? 'bg-white font-semibold text-navy shadow-[inset_0_-3px_0_var(--color-teal),0_1px_2px_rgb(20_40_75/0.08)]'
@@ -81,9 +81,9 @@ export default function CategoryTabs({ board, tab, onChange }: Props) {
           >
             <span className="flex max-w-full min-w-0 items-center gap-1.5">
               {t.key === 'today' ? (
-                <Sun size={12} aria-hidden="true" className="shrink-0 text-amber-500" />
+                <Sun size={12} aria-hidden="true" className="hidden shrink-0 text-amber-500 sm:block" />
               ) : (
-                <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${t.dot}`} />
+                <span aria-hidden="true" className={`hidden h-2 w-2 shrink-0 rounded-full sm:block ${t.dot}`} />
               )}
               {/* Custom names can be long: cut off with "…" (full name on hover). */}
               <span className="truncate">{t.label}</span>
