@@ -202,8 +202,9 @@ export default function Home() {
   return (
     <>
       <RingMotif />
-      {/* White header with the ring logo, as on lotzsolutions.com.au. */}
-      <header className="relative z-10 border-b border-navy/10 bg-white">
+      {/* White header with the ring logo, as on lotzsolutions.com.au, and a teal line underneath
+          (the same 3px teal rule as under "Lotz" in the logo). */}
+      <header className="relative z-10 border-b-[3px] border-teal bg-white">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <Logo size={38} />
