@@ -6,7 +6,7 @@ export const URGENCY_LABELS: Record<Urgency, string> = {
   3: 'Can wait',
 };
 
-const COLOURS: Record<Urgency, string> = {
+export const URGENCY_COLOURS: Record<Urgency, string> = {
   1: 'bg-red-100 text-red-700 ring-red-200',
   2: 'bg-amber-100 text-amber-800 ring-amber-200',
   3: 'bg-slate-100 text-slate-500 ring-slate-200',
@@ -28,7 +28,7 @@ export default function UrgencyBadge({ urgency, name, onChange }: Props) {
   const badge = (
     <span
       aria-hidden={onChange ? true : undefined}
-      className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ring-1 tabular-nums ${COLOURS[urgency]}`}
+      className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ring-1 tabular-nums ${URGENCY_COLOURS[urgency]}`}
     >
       {urgency}
     </span>
