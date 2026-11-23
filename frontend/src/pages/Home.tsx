@@ -3,6 +3,7 @@ import AddForm from '../components/AddForm';
 import CategoryTabs from '../components/CategoryTabs';
 import CompletedSection, { COMPLETED_VIEWS, type CompletedView } from '../components/CompletedSection';
 import Logo from '../components/Logo';
+import RingMotif from '../components/RingMotif';
 import { SortableItem, SortableList } from '../components/Sortable';
 import SubcategoryCard, { type CardActions } from '../components/SubcategoryCard';
 import TodayView from '../components/TodayView';
@@ -200,8 +201,9 @@ export default function Home() {
 
   return (
     <>
+      <RingMotif />
       {/* White header with the ring logo, as on lotzsolutions.com.au. */}
-      <header className="border-b border-navy/10 bg-white">
+      <header className="relative z-10 border-b border-navy/10 bg-white">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <Logo size={38} />
@@ -213,7 +215,7 @@ export default function Home() {
           </span>
         </div>
       </header>
-      <main className="mx-auto max-w-2xl px-4 py-6 text-navy">
+      <main className="relative z-10 mx-auto max-w-2xl px-4 py-6 text-navy">
         {error && (
           <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}

@@ -51,7 +51,7 @@ frontend/
   src/App.tsx              router (Wouter)
   src/pages/Home.tsx       the whole board (one page)
   src/pages/NotFound.tsx
-  src/components/          AddForm, EditableText, Logo (+ .test.tsx), CategoryTabs (Today / All / Work / Business / Other), ConfirmDelete (+ .test.tsx),
+  src/components/          AddForm, EditableText, Logo (+ .test.tsx), RingMotif, CategoryTabs (Today / All / Work / Business / Other), ConfirmDelete (+ .test.tsx),
                            CompletedSection, Modal (shared <dialog>), NotesDialog (+ .test.tsx), Sortable (dnd-kit),
                            SubcategoryCard (+ CardActions), TodayView, AddToTodayDialog (+ .test.tsx), UrgencyBadge (+ .test.tsx)
   src/lib/api.ts           fetch client; API_BASE from VITE_API_URL (default localhost:8787)
@@ -83,7 +83,7 @@ api/
 ```
 
 ## Look and feel
-- Branding matches the website lotzsolutions.com.au (repo `michaellotz-mj/Website`, `src/styles/global.css` and `Logo.astro`): white header with the ring logo (`components/Logo.tsx`, a React port of `Logo.astro`), a divider, then "To Do List"; ring favicon (`public/favicon.svg`), `theme-color` navy; tab title "To Do List · Lotz Solutions".
+- Branding matches the website lotzsolutions.com.au (repo `michaellotz-mj/Website`, `src/styles/global.css` and `Logo.astro`): white header with the ring logo (`components/Logo.tsx`, a React port of `Logo.astro`), a divider, then "To Do List"; ring favicon (`public/favicon.svg`), `theme-color` navy; a large faint ring in the background (`components/RingMotif.tsx`, port of the website's `RingMotif.astro`), fixed to the bottom-right (vertically centred on wide screens) at `z-0`, with the header and `<main>` at `relative z-10` so every box covers it; tab title "To Do List · Lotz Solutions".
 - Palette and font live in `frontend/src/index.css` (`@theme`), copied from the website: navy `#14284B`, teal `#1A9C8C` (`teal-text` `#13786C` for text/borders on white), mist page `#F6F8FB`, muted `#4A5B78`. Tailwind's `slate` scale is re-tinted to the brand navy, so existing `slate-*` classes follow the brand. Font: Manrope (`@fontsource-variable/manrope`, self-hosted, no Google request). Keyboard focus: 3px teal outline, like the website. Selected tab: white with a teal underline. Categories: Work navy, Business teal, Other sand. `CATEGORY_STYLES` in `src/lib/categoryStyles.ts` maps categories to full class names so Tailwind generates them.
 - Tabs: Today, All, Work, Business, Other, each with a done/total sub-category count. The selected tab is remembered in localStorage (`todo-tab`, try/catch, defaults to All). Arrow/Home/End keys move between tabs. On phones the count sits under the label (text-xs) so all five fit at 360px.
 - Deleting asks inline ("Delete? Yes / No", No focused, Escape cancels) via `ConfirmDelete`, for both activities and sub-categories. No browser `confirm()`: it is blocked in embedded previews.
@@ -163,6 +163,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - **No authentication yet (by Michael's choice).** Anyone who finds the URLs can read/edit the list. Recommended fix when wanted: Cloudflare Access (free, email one-time code) in front of both Workers — no app code needed.
 
 ## Gotchas
+- Background ring: don't use a negative z-index for it — it disappears behind any page background (it did in the preview). Keep it at `z-0` under `relative z-10` content.
 - Neon driver typing: use `neon<false, false>(...)` so results type as row arrays.
 - Activity tick is optimistic (`updateActivityInBoard`) — a controlled checkbox otherwise doesn't change until the API round-trip finishes, which feels laggy. The board reloads after every change, so a failed save corrects itself.
 - Sub-category completion is decided by `isSubcategoryComplete` (activities if any, else the sub-category's own `done`). Use it, not `activityProgress(...).complete`, anywhere "finished" matters.
@@ -173,7 +174,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
-- **2026-11-23** — Rebranded to match lotzsolutions.com.au: ring logo in a white header, Manrope font, navy/teal/mist palette (slate re-tinted), teal tab underline and focus outline, ring favicon. Frontend only; no schema or API change.
+- **2026-11-23** — Rebranded to match lotzsolutions.com.au: ring logo in a white header, Manrope font, navy/teal/mist palette (slate re-tinted), teal tab underline and focus outline, ring favicon, faint background ring (behind all boxes). Frontend only; no schema or API change.
 - **2026-11-23** — PR #6 live: direct completion and urgency re-ranking; `mig-005` applied to production first. Michael confirmed the live app works.
 - **2026-11-23** — Urgency re-ranking extended: every urgency change moves the sub-category just below everything more urgent (2 below the 1s, 3 below the 2s), in its category and on Today. No schema change.
 - **2026-11-23** — Sub-categories with no activities can be ticked off directly (tick box replaces the `0/0` count). **Schema change:** `subcategories.done`, `done_at` via `mig-005` (also in `setup-database.sql`). Fixed `mig-001` breaking on a `;` at the end of a comment line, and the expected column count in `setup-database.sql`. Long names no longer push the rename pencil over the note icon on phones.
