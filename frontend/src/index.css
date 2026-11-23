@@ -11,6 +11,7 @@
   --color-teal: #1a9c8c; /* logo, lines, decoration */
   --color-teal-text: #13786c; /* buttons, links, focus: readable on white (5.3:1) */
   --color-mist: #f6f8fb; /* page background */
+  --color-teal-mist: #eaf5f2; /* very light brand teal: header background */
   --color-muted: #4a5b78; /* secondary text */
   --color-brand: #13786c; /* primary buttons and focus outlines (= teal-text) */
 
