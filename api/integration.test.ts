@@ -211,6 +211,32 @@ describe('To Do API', () => {
     expect(await order()).toEqual([q, p, r]);
   });
 
+  it('ticking moves an activity just below the unticked ones; unticking moves it back to the end of the to-do ones', async () => {
+    const sub = await api('POST', '/api/subcategories', { category: 'other', name: `${TAG} tick order` });
+    extraIds.push(sub.data.id);
+    const ids: Record<string, number> = {};
+    for (const t of ['A', 'B', 'C', 'D']) {
+      ids[t] = (await api('POST', `/api/subcategories/${sub.data.id}/activities`, { title: t })).data.id;
+    }
+    const order = async () => {
+      const { data } = await api('GET', '/api/board');
+      const s = data.flatMap((c: any) => c.subcategories).find((x: any) => x.id === sub.data.id);
+      return s.activities.map((a: any) => a.title).join('');
+    };
+    await api('PATCH', `/api/activities/${ids.B}`, { done: true });
+    expect(await order()).toBe('ACDB');
+    await api('PATCH', `/api/activities/${ids.A}`, { done: true });
+    expect(await order()).toBe('CDAB'); // newest tick on top of the ticked ones
+    await api('PATCH', `/api/activities/${ids.B}`, { done: false });
+    expect(await order()).toBe('CDBA'); // unticked: end of the to-do ones
+    // Ticking again with the same value, or renaming, moves nothing.
+    await api('PATCH', `/api/activities/${ids.A}`, { done: true, title: 'A' });
+    expect(await order()).toBe('CDBA');
+    // A new activity goes to the bottom of the to-do ones, above the ticked ones.
+    await api('POST', `/api/subcategories/${sub.data.id}/activities`, { title: 'E' });
+    expect(await order()).toBe('CDBEA');
+  });
+
   it('renames a category, shows it on the board, and refuses new or invalid categories', async () => {
     const board = async () => (await api('GET', '/api/board')).data as any[];
     const before = (await board()).find((c) => c.key === 'other').label;

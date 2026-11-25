@@ -13,6 +13,7 @@ import {
   reorderActivitiesInBoard,
   reorderInBoard,
   splitCompleted,
+  tickActivityInBoard,
   subcategoryProgress,
   updateActivityInBoard,
   updateSubcategoryInBoard,
@@ -48,6 +49,33 @@ describe('updateActivityInBoard', () => {
     const next = updateActivityInBoard(board, 2, { done: true });
     expect(next[0].subcategories[0].activities).toEqual([act(1, false), act(2, true)]);
     expect(board[0].subcategories[0].activities[1].done).toBe(false);
+  });
+});
+
+describe('tickActivityInBoard', () => {
+  const titles = (b: { subcategories: { activities: { id: number; done: boolean }[] }[] }[]) =>
+    b[0].subcategories[0].activities.map((a) => `${a.id}${a.done ? '✓' : ''}`).join(' ');
+  const make = (...acts: ReturnType<typeof act>[]) => [
+    { key: 'work' as const, label: 'Work', subcategories: [{ id: 9, name: 'S', notes: '', today: false, todayPosition: 0, urgency: 2 as const, done: false, activities: acts }] },
+  ];
+
+  it('moves a ticked activity to the top of the ticked ones', () => {
+    const b = make(act(1, false), act(2, false), act(3, false), act(4, true));
+    expect(titles(tickActivityInBoard(b, 2, true))).toBe('1 3 2✓ 4✓');
+    expect(titles(tickActivityInBoard(tickActivityInBoard(b, 2, true), 1, true))).toBe('3 1✓ 2✓ 4✓');
+  });
+
+  it('moves an unticked activity to the bottom of the to-do ones', () => {
+    expect(titles(tickActivityInBoard(make(act(1, false), act(2, true), act(3, true)), 3, false))).toBe('1 3 2✓');
+  });
+
+  it('moves ticked activities sitting above the to-do ones down below them', () => {
+    expect(titles(tickActivityInBoard(make(act(1, true), act(2, false), act(3, false)), 2, true))).toBe('3 2✓ 1✓');
+  });
+
+  it('moves nothing when the value is unchanged', () => {
+    const b = make(act(1, true), act(2, false));
+    expect(tickActivityInBoard(b, 1, true)).toBe(b);
   });
 });
 
