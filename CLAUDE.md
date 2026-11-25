@@ -68,6 +68,7 @@ api/
   src/board.ts             pure row → nested board shaping (+ .test.ts)
   src/redact.ts            strips connection strings from logged errors (+ .test.ts)
   src/urgency.ts           placeByUrgency: where a sub-category goes when its urgency changes (+ .test.ts)
+  src/tickOrder.ts         placeByDone: where an activity goes when ticked, unticked or added (+ .test.ts)
   schema.sql               reference schema (source of truth)
   setup-database.sql       one-paste, idempotent setup/upgrade for a database in the Neon SQL Editor
   mig-env.mjs              shared loader: DATABASE_URL from .dev.vars for the mig-*.mjs scripts
@@ -95,6 +96,7 @@ api/
 - Notes: a note icon on each sub-category (category-coloured and filled when it has notes) opens a modal `<dialog>` with a textarea. Save (or Ctrl/Cmd+Enter) saves; Cancel, Escape or clicking outside discards. Saved optimistically via `PATCH /api/subcategories/:id {notes}`.
 - Today: a shared list of sub-categories picked from any category (same records, not copies, so ticks show everywhere). Add via the ☀ toggle on any card, the "Add from your lists" picker (always lists Work, Business and Other: unfinished sub-categories with Add, ones already on Today marked "On Today", an empty-state line, and a "New … sub-category" box per category that creates straight onto Today), or "New task for today" (category select + name; `POST /api/subcategories {today: true}`). Today has its own drag order (`today_position`, `PUT /api/today/order`). Finished Today items show in Today's Completed section; "Clear finished from Today" sets `today: false` on them. Morning clear-out: on the first load of each local day (also when the app becomes visible again, and every 5 minutes, so an overnight tab clears too) the app calls `POST /api/today/clear-finished {before: local midnight}`, which takes off Today every sub-category whose activities were all ticked before that moment (latest `activities.done_at`). Unfinished items, empty ones, and ones finished today stay. Uses the device's own time zone; a failed clear-out never blocks loading. In mixed lists the category tag sits beside the progress bar.
 - Urgency: each sub-category has a 1 / 2 / 3 badge before its name (1 red "Do first", 2 amber "Important, not urgent" — the default, 3 grey "Can wait"). The badge is a transparent native `<select>` over the number, so phones show their own picker. Every urgency *change* re-ranks the sub-category just below the last unfinished, more-urgent item (1 → top, 2 → below the 1s, 3 → below the 2s), in its category and on Today. Rule: `placeByUrgency` in `api/src/urgency.ts` (server, in the PATCH) mirrored in `frontend/src/lib/progress.ts` (optimistic). After that, drag order wins; setting the same urgency again moves nothing. The Add-to-Today picker shows a read-only badge.
+- Ticked activities sink: in each sub-category the still-to-do activities come first, then the ticked ones, each group keeping its order. Ticking puts an activity at the top of the ticked ones, unticking (or adding a new one) at the bottom of the to-do ones; any ticked activity above the to-do ones (older data or dragged there) moves down at the same time. Rule: `placeByDone` in `api/src/tickOrder.ts` (server, in PATCH/POST activities) mirrored in `frontend/src/lib/progress.ts` (`tickActivityInBoard`, optimistic). Sending the same `done` again or renaming moves nothing; drag order still works within each group.
 - Direct completion: a sub-category with no activities shows a tick box (before the urgency badge) instead of the `0/0` count. Ticking it marks it finished everywhere (strike-through, Completed section, tab counts, Today, morning clear-out). Adding an activity re-opens it (the API resets `done` in the same statement), and from then on its activities decide.
 - Category names: Work, Business and Other can be renamed (pencil at the right of the heading, before the done/total pill, in All and each category's tab; 1–20 characters, `MAX_CATEGORY_LABEL`). Saved in `category_labels` via `PUT /api/categories/:key`, optimistic via `renameCategoryInBoard`; the new name shows on the tab, heading, tags, pickers and "New … sub-category" boxes. The keys stay `work`/`business`/`other`, so data and colours are unaffected. Today and All can't be renamed, and no categories can be added (unknown keys 404; the table's CHECK allows only the three). Long names are cut off with "…" on tabs (full name on hover).
 - Colour is used for dots, count pills, tick boxes and the per-sub-category progress bar; urgency badge colours (red / amber / grey) are unchanged by the rebrand.
@@ -117,9 +119,9 @@ api/
 | POST | `/api/today/clear-finished` | `{before}` (ISO, within a week of now) | sets `today = false` on sub-categories finished before `before` (all activities ticked, latest `done_at`; or, with no activities, `done` with `done_at`); returns `{cleared: ids}` |
 | PUT | `/api/subcategories/order` | `{category, ids}` | sets `position` = index; ids from other categories ignored |
 | DELETE | `/api/subcategories/:id` | – | cascades to activities |
-| POST | `/api/subcategories/:id/activities` | `{title}` | 404 if sub-category missing; also resets the sub-category's own `done` |
+| POST | `/api/subcategories/:id/activities` | `{title}` | 404 if sub-category missing; also resets the sub-category's own `done`; placed at the bottom of the to-do activities (`placeByDone`) |
 | PUT | `/api/subcategories/:id/activities/order` | `{ids}` | sets activity `position` = index; ids from other sub-categories ignored |
-| PATCH | `/api/activities/:id` | `{title?, done?}` | **partial** — omitted fields kept via `COALESCE`; `done_at` maintained |
+| PATCH | `/api/activities/:id` | `{title?, done?}` | **partial** — omitted fields kept via `COALESCE`; `done_at` maintained; a changed `done` re-orders the sub-category's activities (to-do first, then ticked; `placeByDone`) |
 | DELETE | `/api/activities/:id` | – | |
 
 Errors: 400 `{error}` for bad input, 404 unknown id/route, 405 wrong method, 500 `{error:"internal error"}` (message logged, never the connection string).
@@ -184,6 +186,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-11-25** — Ticked activities move below the ones still to do (newest tick at the top of the ticked ones); unticked and new activities go to the bottom of the to-do ones. `placeByDone` in API + frontend; guide updated. No schema change.
 - **2026-11-23** — Fixed: random `Tests / api` failures when two CI runs overlapped on the shared dev database; the `api` job now runs one at a time (`concurrency`). Workflow only; no app change.
 - **2026-11-23** — PR #8 merged: user guide (`/guide`) and header Guide button live. No schema change. Michael confirmed it works live.
 - **2026-11-23** — User guide page (`/guide`) with a **Guide** button in the header; header extracted to `AppHeader`. Frontend only; no schema or API change.

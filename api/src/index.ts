@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { buildBoard, type ActivityRow, type CategoryLabelRow, type SubcategoryRow } from './board';
 import { redactSecrets } from './redact';
+import { placeByDone, type Tickable } from './tickOrder';
 import { placeByUrgency, type Ranked } from './urgency';
 import {
   parseActivityReorder,
@@ -82,6 +83,18 @@ async function placeAfterUrgencyChange(sql: Sql, id: number, urgency: number): P
       FROM unnest(${todayIds}::int[]) WITH ORDINALITY AS o(id, ord)
       WHERE s.id = o.id AND s.today`;
   }
+}
+
+/** Re-orders an activity's list after it is ticked, unticked or added, per `placeByDone`. */
+async function placeActivity(sql: Sql, id: number, subcategoryId: number): Promise<void> {
+  const rows = (await sql`
+    SELECT id, done FROM activities WHERE subcategory_id = ${subcategoryId}
+    ORDER BY position, id`) as Tickable[];
+  const ids = placeByDone(rows, id);
+  await sql`
+    UPDATE activities a SET position = o.ord
+    FROM unnest(${ids}::int[]) WITH ORDINALITY AS o(id, ord)
+    WHERE a.id = o.id AND a.subcategory_id = ${subcategoryId}`;
 }
 
 const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
@@ -254,7 +267,10 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
               (SELECT COALESCE(MAX(position), 0) + 1 FROM activities WHERE subcategory_id = s.id)
             FROM subcategories s WHERE s.id = ${subcategoryId}
             RETURNING id, title, done`;
-          return rows.length ? json(rows[0], 201) : notFound();
+          if (!rows.length) return notFound();
+          // New activities go to the bottom of the to-do ones, above anything already ticked.
+          await placeActivity(sql, rows[0].id, subcategoryId);
+          return json(rows[0], 201);
         }),
       ),
   },
@@ -280,6 +296,8 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
       validated(parseId(params[0]), (id) =>
         // Partial update: null fields keep their current value.
         validated(parseActivityUpdate(body), async ({ title, done }) => {
+          const before = await sql`SELECT done, subcategory_id FROM activities WHERE id = ${id}`;
+          if (!before.length) return notFound();
           const rows = await sql`
             UPDATE activities SET
               title = COALESCE(${title}::text, title),
@@ -291,6 +309,9 @@ const routes: { method: string; pattern: RegExp; handler: Handler }[] = [
               END
             WHERE id = ${id}
             RETURNING id, title, done`;
+          // Ticking moves it to the top of the ticked ones; unticking to the bottom of the to-do ones.
+          // Sending the same value again leaves it where the user put it.
+          if (done !== null && done !== before[0].done) await placeActivity(sql, id, before[0].subcategory_id);
           return rows.length ? json(rows[0]) : notFound();
         }),
       ),

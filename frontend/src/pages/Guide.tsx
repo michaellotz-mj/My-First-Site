@@ -92,7 +92,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
         </li>
         <li>
           <Ui>An activity</Ui>: type it in the <Ui>New activity</Ui> box inside a sub-category card and press Enter (or
-          tap <Ui>+</Ui>).
+          tap <Ui>+</Ui>). It is added at the end of the activities still to do, above any ticked ones.
         </li>
         <li>
           Tap the arrow <Icon label="arrow">
@@ -108,7 +108,11 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
     title: 'Ticking things off',
     body: (
       <ul className="list-disc space-y-1 pl-5">
-        <li>Tick an activity's box when it is done. It is crossed out, and the card's progress bar fills up.</li>
+        <li>
+          Tick an activity's box when it is done. It is crossed out, the card's progress bar fills up, and it moves down
+          to sit just below the activities still to do (above anything you ticked earlier), so what's left is always at
+          the top.
+        </li>
         <li>
           When every activity in a sub-category is ticked, the whole sub-category is crossed out and moves to the{' '}
           <Ui>Completed</Ui> section at the bottom of the page.
@@ -117,7 +121,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
           A sub-category with no activities has its own tick box, before the number badge, so you can tick it off
           directly. If you later add an activity to it, it opens again.
         </li>
-        <li>Untick something to bring it back.</li>
+        <li>Untick something to bring it back. An unticked activity goes to the end of the still-to-do ones.</li>
         <li>
           The <Ui>Completed</Ui> section: tap its heading to open or fold it. <Ui>Hide</Ui>{' '}
           <Icon label="hide">

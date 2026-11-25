@@ -133,6 +133,24 @@ export function reorderActivitiesInBoard(board: CategoryBoard[], subcategoryId: 
   }));
 }
 
+/**
+ * New activity order (top first) after `id` is ticked or unticked: the still-to-do activities first, then
+ * the ticked ones, each keeping its order, with `id` between the two. So a tick lands at the top of the
+ * ticked ones and an untick at the bottom of the to-do ones. Mirrors `placeByDone` in the API.
+ */
+export function placeByDone(activities: Activity[], id: number): number[] {
+  const others = activities.filter((a) => a.id !== id);
+  return [...others.filter((a) => !a.done).map((a) => a.id), id, ...others.filter((a) => a.done).map((a) => a.id)];
+}
+
+/** Ticks or unticks an activity on screen and moves it per `placeByDone` (unchanged value: no move). */
+export function tickActivityInBoard(board: CategoryBoard[], id: number, done: boolean): CategoryBoard[] {
+  const sub = board.flatMap((c) => c.subcategories).find((s) => s.activities.some((a) => a.id === id));
+  if (!sub || sub.activities.find((a) => a.id === id)!.done === done) return board;
+  const next = updateActivityInBoard(board, id, { done });
+  return reorderActivitiesInBoard(next, sub.id, placeByDone(sub.activities, id));
+}
+
 /** Returns a new board with one sub-category's fields changed (optimistic rename / notes save). */
 export function updateSubcategoryInBoard(
   board: CategoryBoard[],

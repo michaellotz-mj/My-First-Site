@@ -26,7 +26,7 @@ import {
   renameCategoryInBoard,
   splitCompleted,
   subcategoryProgress,
-  updateActivityInBoard,
+  tickActivityInBoard,
   updateSubcategoryInBoard,
   type Tab,
 } from '../lib/progress';
@@ -100,10 +100,13 @@ export default function Home() {
     [reload],
   );
 
-  /** Ticks instantly on screen, then saves; reload corrects it if the save fails. */
+  /**
+   * Ticks instantly on screen and moves it (ticked: top of the ticked ones; unticked: bottom of the
+   * to-do ones), then saves; the API applies the same move. Reload corrects it if the save fails.
+   */
   const toggleActivity = useCallback(
     (id: number, done: boolean) => {
-      setBoard((b) => b && updateActivityInBoard(b, id, { done }));
+      setBoard((b) => b && tickActivityInBoard(b, id, done));
       return mutate(() => api.updateActivity(id, { done }));
     },
     [mutate],
