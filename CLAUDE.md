@@ -177,7 +177,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Rename pencils (`EditableText`): with a mouse they appear on hover or keyboard focus (`[@media(hover:hover)]:opacity-0`); touch screens can't hover, so there they are always shown. Don't go back to `sm:opacity-0` — iPads are wider than `sm` and the pencil was invisible there. Category headings pass `pencilAlways` and `pencilRight`; sub-category and activity rows pass `pencilRight`: the name fills the row and the pencil sits at its right end, just before the done/total pill (category), the notes icon (sub-category) or the bin (activity).
 - CI integration tests share one Neon `dev` database, so the `api` job has `concurrency: neon-dev-database` (one run at a time; the next waits). Before it, two overlapping runs (push to `main` + push to the branch) made random integration tests fail (clear-out, urgency order). Don't remove it. GitHub keeps only one *waiting* run per group, so a third overlapping run cancels the waiting one (shows as cancelled, not failed).
 - Neon driver typing: use `neon<false, false>(...)` so results type as row arrays.
-- Activity tick is optimistic (`updateActivityInBoard`) — a controlled checkbox otherwise doesn't change until the API round-trip finishes, which feels laggy. The board reloads after every change, so a failed save corrects itself.
+- Activity tick is optimistic (`tickActivityInBoard`, which also applies `placeByDone`) — a controlled checkbox otherwise doesn't change until the API round-trip finishes, which feels laggy. The board reloads after every change, so a failed save corrects itself.
 - Sub-category completion is decided by `isSubcategoryComplete` (activities if any, else the sub-category's own `done`). Use it, not `activityProgress(...).complete`, anywhere "finished" matters.
 - `mig-001` splits `schema.sql` into statements at lines ending in `;`. It now strips `--` comment lines first, but still avoid ending a comment line with `;` in `schema.sql`.
 - Workers Builds also builds every non-`main` branch as a **Preview**. Recent Wrangler refuses that unless the config has a `previews` block: `api/wrangler.toml` has `[previews.vars] ALLOWED_ORIGINS = ""` (previews get no `DATABASE_URL`, so they can't reach production data) and `frontend/wrangler.jsonc` has `"previews": {}`. Add any new `[vars]` to `[previews.vars]` too, with a preview-safe value.
@@ -186,6 +186,7 @@ Deploys use **Cloudflare Workers Builds** (Cloudflare connected to this GitHub r
 - Authentication (see Security).
 
 ## Change log
+- **2026-11-25** — PR #10 merged: ticked activities sink below the to-do ones, live. No schema change.
 - **2026-11-25** — Ticked activities move below the ones still to do (newest tick at the top of the ticked ones); unticked and new activities go to the bottom of the to-do ones. `placeByDone` in API + frontend; guide updated. No schema change.
 - **2026-11-23** — Fixed: random `Tests / api` failures when two CI runs overlapped on the shared dev database; the `api` job now runs one at a time (`concurrency`). Workflow only; no app change.
 - **2026-11-23** — PR #8 merged: user guide (`/guide`) and header Guide button live. No schema change. Michael confirmed it works live.
